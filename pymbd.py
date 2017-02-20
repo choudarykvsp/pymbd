@@ -3,7 +3,11 @@ import os
 import json
 import sys
 import numpy as np
-from mbd import mbd
+try:
+    from mbd import mbd
+except ImportError:
+    sys.stderr.write("module mbd not found, trying mbd_scalapack")
+    from mbd_scalapack import mbd_scalapack as mbd
 
 try:
     from mpi4py import MPI
