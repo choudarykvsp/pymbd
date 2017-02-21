@@ -124,8 +124,11 @@ interface tostr
     module procedure tostr_dble_
 end interface
 
-! external :: ZHEEV, DGEEV, DSYEV, DGETRF, DGETRI, DGESV, ZGETRF, ZGETRI, &
-!     ZGEEV, ZGEEB, PDLAWRITEBIN, PZLAWRITEBIN
+! external :: ZHEEV, DGEEV, DSYEV, DGETRF, DGETRI, DGESV, ZGETRF, &
+!             ZGETRI, ZGEEV, ZGEEB, BLACS_BARRIER, BLACS_GRIDINFO, &
+!             INFOG2L, DGERV2D, DGESD2D, ICEIL, PDGETRI, PDSYEV, &
+!             numroc, PZHEEV, BLACS_PINFO, BLACS_GET, BLACS_GRIDINIT, &
+!             descinit, PDGETRF, DGSUM2D, BLACS_GRIDEXIT, pdelget
 
 contains
 
@@ -2710,7 +2713,7 @@ function do_scs_s(mode, version, xyz, alpha, R_vdw, beta, a, &
     
     !!!!!  BLACS INITIALIZATION  !!!!!
     !! get current processor and total number of processors
-    call blacs_pinfo(my_task_blacs, n_tasks_blacs)
+    call BLACS_PINFO(my_task_blacs, n_tasks_blacs)
     
     !! build square processor grid from available processors
     do nprows = int(  sqrt( dble(n_tasks_blacs) )  ), 1, -1
@@ -2718,9 +2721,9 @@ function do_scs_s(mode, version, xyz, alpha, R_vdw, beta, a, &
     enddo
     npcols = n_tasks_blacs/nprows
     
-    call blacs_get(0, 0, scs_ctxt)
-    call blacs_gridinit(scs_ctxt, 'R', nprows, npcols)
-    call blacs_gridinfo(scs_ctxt, nprows, npcols, my_prow, my_pcol)
+    call BLACS_GET(0, 0, scs_ctxt)
+    call BLACS_GRIDINIT(scs_ctxt, 'R', nprows, npcols)
+    call BLACS_GRIDINFO(scs_ctxt, nprows, npcols, my_prow, my_pcol)
     
     !! block sizes, local shapes for (3n by 3n) and (n by n) matrices
     !! fb3n can be adjusted for performance (assert: mod(fb3n, 3) = 0)
@@ -2892,7 +2895,7 @@ function do_scs_s(mode, version, xyz, alpha, R_vdw, beta, a, &
     !!!!!  RESTORE NTASKS AND FINISH UP  !!!!!
     n_tasks = n_tasks_bak
     call ts(-31)
-    call blacs_gridexit(scs_ctxt)
+    call BLACS_GRIDEXIT(scs_ctxt)
     
 end function do_scs_s
 
@@ -3162,14 +3165,14 @@ function get_single_mbd_energy_s(mode, version, xyz, alpha_0, omega, &
     size3n = 3*size1n
     
     !! blacs context, grid info, ...
-    call blacs_pinfo(my_task_blacs, n_tasks_blacs)
+    call BLACS_PINFO(my_task_blacs, n_tasks_blacs)
     do nprows = int(  sqrt( dble(n_tasks_blacs) )  ), 1, -1
         if (mod(n_tasks_blacs, nprows) == 0) exit
     enddo
     npcols = n_tasks_blacs/nprows
-    call blacs_get(0, 0, cfdm_ctxt)
-    call blacs_gridinit(cfdm_ctxt, 'R', nprows, npcols)
-    call blacs_gridinfo(cfdm_ctxt, nprows, npcols, my_prow, my_pcol)
+    call BLACS_GET(0, 0, cfdm_ctxt)
+    call BLACS_GRIDINIT(cfdm_ctxt, 'R', nprows, npcols)
+    call BLACS_GRIDINFO(cfdm_ctxt, nprows, npcols, my_prow, my_pcol)
     io_proc = ( (my_prow==0) .and. (my_pcol==0) )
     
     !! block sizes, local shapes for (3n by 3n) and (n by n) matrices
@@ -3268,7 +3271,7 @@ function get_single_mbd_energy_s(mode, version, xyz, alpha_0, omega, &
         !! write eigenvectors to output file (see scalapack_io.f)
         if (allocated(my_write_work)) deallocate(my_write_work)
         allocate(my_write_work(fb3n), stat=ierr)
-        call PDLAWRITEBIN('mbd_eigenmodes.out', size3n, size3n, my_evecs, &
+        call PDWRITEEIGVEC('mbd_eigenmodes.out', size3n, size3n, my_evecs, &
                           1, 1, desc3n3n, 0, 0, my_write_work)
         if (allocated(my_write_work)) deallocate(my_write_work)
     
@@ -3315,42 +3318,10 @@ function get_single_mbd_energy_s(mode, version, xyz, alpha_0, omega, &
     ene = 1.d0/2*sum(sqrt(eigs))-3.d0/2*sum(omega)
     
     ! destroy blacs grid, restore n_tasks
-    call blacs_gridexit(cfdm_ctxt)
+    call BLACS_GRIDEXIT(cfdm_ctxt)
     n_tasks = n_tasks_bak
     
 end function get_single_mbd_energy_s
-
-
-subroutine write_eigenenergies(tensor_evals, evals_fname, k_point)
-    real(8), intent(in)            :: tensor_evals(:)
-    character(len=*), intent(in)   :: evals_fname
-    
-    real(8), intent(in), optional  :: k_point(3)
-    integer                        :: fid_evals, i_eval
-    
-    
-    fid_evals = get_FileID()
-    if ( present(k_point) )  then
-        open(file=evals_fname, unit=fid_evals, position='append', &
-             status='unknown', form='formatted')
-    else
-        open(file=evals_fname, unit=fid_evals, status='replace', &
-             form='formatted')
-    endif
-    
-    if (present(k_point)) write(fid_evals, "(A10,3F10.6)") "k point = ",&
-                                      &k_point(1), k_point(2), k_point(3)
-    do i_eval=1, size(tensor_evals)
-        if (tensor_evals(i_eval) > 0.d0) then
-            write(fid_evals, *) sqrt(tensor_evals(i_eval))
-        else
-            write(fid_evals, *) 0.d0
-        endif
-    enddo
-    if ( present(k_point) ) write(fid_evals, *) ""
-    close(fid_evals)
-    
-end subroutine write_eigenenergies
 
 
 function get_reciprocal_mbd_energy_s(mode, version, xyz,alpha_0, &
@@ -3539,14 +3510,14 @@ function get_single_reciprocal_mbd_ene_s(mode, version, xyz, alpha_0, &
     size3n = 3*size1n
     
     !! blacs context, grid info, ...
-    call blacs_pinfo(my_task_blacs, n_tasks_blacs)
+    call BLACS_PINFO(my_task_blacs, n_tasks_blacs)
     do nprows = int(  sqrt( dble(n_tasks_blacs) )  ), 1, -1
         if (mod(n_tasks_blacs, nprows) == 0) exit
     enddo
     npcols = n_tasks_blacs/nprows
-    call blacs_get(0, 0, cfdm_ctxt)
-    call blacs_gridinit(cfdm_ctxt, 'R', nprows, npcols)
-    call blacs_gridinfo(cfdm_ctxt, nprows, npcols, my_prow, my_pcol)
+    call BLACS_GET(0, 0, cfdm_ctxt)
+    call BLACS_GRIDINIT(cfdm_ctxt, 'R', nprows, npcols)
+    call BLACS_GRIDINFO(cfdm_ctxt, nprows, npcols, my_prow, my_pcol)
     io_proc = ( (my_prow==0) .and. (my_pcol==0) )
     
     !! block sizes, local shapes for (3n by 3n) and (n by n) matrices
@@ -3658,9 +3629,9 @@ function get_single_reciprocal_mbd_ene_s(mode, version, xyz, alpha_0, &
         !! write eigenvectors to output file (see scalapack_io.f)
         if (allocated(my_write_work)) deallocate(my_write_work)
         allocate(my_write_work(fb3n), stat=ierr)
-        call PZLAWRITEBIN("mbd_eigenmodes_kpt"//trim(tostr(kptID))//".out", &
+        call PZWRITEEIGVEC("mbd_eigenmodes_kpt"//trim(tostr(kptID))//".out", &
                           size3n, size3n, my_evecs, 1, 1, desc3n3n, &
-                          0, 0, my_write_work)
+                          0, 0, my_write_work, k_point)
         if (allocated(my_write_work)) deallocate(my_write_work)
     else
         if ( allocated(my_evecs) ) deallocate(my_evecs)
@@ -3707,7 +3678,7 @@ function get_single_reciprocal_mbd_ene_s(mode, version, xyz, alpha_0, &
                 close(i, status='delete')
             endif
         endif
-
+        
         call write_eigenenergies(eigs, "mbd_eigenvalues_reciprocal.out", &
                                  k_point=k_point)
     endif
@@ -3724,7 +3695,7 @@ function get_single_reciprocal_mbd_ene_s(mode, version, xyz, alpha_0, &
     ene = 1.d0/2*sum(sqrt(eigs))-3.d0/2*sum(omega)
     
     ! destroy blacs grid, restore n_tasks
-    call blacs_gridexit(cfdm_ctxt)
+    call BLACS_GRIDEXIT(cfdm_ctxt)
     n_tasks = n_tasks_bak
     
 end function get_single_reciprocal_mbd_ene_s
@@ -3761,6 +3732,420 @@ function map_local2global(idx_local, npX, blocksize, my_pX, pX_start) &
         idx_global = blocksize*idx_global + mod(idx_local-1,blocksize)+1
         
 end function map_local2global
+
+
+subroutine write_eigenenergies(tensor_evals, evals_fname, k_point)
+    real(8), intent(in)            :: tensor_evals(:)
+    character(len=*), intent(in)   :: evals_fname
+    
+    real(8), intent(in), optional  :: k_point(3)
+    integer                        :: fid_evals, i_eval
+    
+    
+    fid_evals = get_FileID()
+    if ( present(k_point) )  then
+        open(file=evals_fname, unit=fid_evals, position='append', &
+             status='unknown', form='formatted')
+    else
+        open(file=evals_fname, unit=fid_evals, status='replace', &
+             form='formatted')
+    endif
+    
+    if (present(k_point)) write(fid_evals, "(A10,3F10.6)") "k point = ",&
+                                      &k_point(1), k_point(2), k_point(3)
+    do i_eval=1, size(tensor_evals)
+        if (tensor_evals(i_eval) > 0.d0) then
+            write(fid_evals, *) sqrt(tensor_evals(i_eval))
+        else
+            write(fid_evals, *) 0.d0
+        endif
+    enddo
+    if ( present(k_point) ) write(fid_evals, *) ""
+    close(fid_evals)
+    
+end subroutine write_eigenenergies
+
+
+function get_FileID()
+    integer        :: get_FileID
+    integer, save  :: currentID = minFileID
+    
+    if (currentID > maxFileID) then
+        write(*,*) "error('get_FileID: No more free file identification numbers')"
+    end if
+    get_FileID = currentID
+    currentID = currentID + 1
+    
+end function get_FileID
+
+
+subroutine PZWRITEEIGVEC( FILNAM, M, N, A, IA, JA, DESCA, IRWRIT, &
+                          ICWRIT, WORK, KPOINT)
+    ! adapted from PZLAWRITE (ScaLAPACK/tools) originally written by
+    ! Antoine Petitet, August 1995 (petitet@cs.utk.edu)
+    ! adapted by Julie Langou, April 2007 (julie@cs.utk.edu)
+    ! further adapted to write unformatted binary file and adapted to
+    ! F90 by Martin Stoehr, February 2017 (martin.stoehr@uni.lu)
+    !
+    ! Purpose
+    ! =======
+    !
+    ! PZWRITEEIGVEC writes to a file named FILNAM a distributed matrix 
+    ! sub(A) denoting A(IA:IA+M-1,JA:JA+N-1). The local pieces are sent
+    ! to and written by the process of coordinates (IRWWRITE, ICWRIT).
+    !
+    !  WORK must be of size >= MB_ = DESCA( MB_ ).
+    !
+    ! ==================================================================
+    
+    integer, intent(in)            :: IA, ICWRIT, IRWRIT, JA, M, N
+    character(len=*), intent(in)   :: FILNAM
+    integer, intent(in)            :: DESCA(:)
+    complex(8), intent(in)         :: A(*), WORK(:)
+    real(8), intent(in), optional  :: KPOINT(3)
+    
+    integer, parameter  :: NOUT=13, BLOCK_CYCLIC_2D=1, CSRC_=8, &
+                           CTXT_=2, DLEN_=9, DT_=1, LLD_=9, MB_=5, &
+                           M_=3, NB_=6, N_=4, RSRC_=7
+    integer             :: H, I, IACOL, IAROW, IB, ICTXT, ICURCOL, &
+                           ICURROW, II, IIA, I_N, J, JB, JJ, JJA, JN,&
+                           K, LDA, MYCOL, MYROW, NPCOL, NPROW, ICEIL
+    
+    
+    !! Get grid parameters
+    ICTXT = DESCA( CTXT_ )
+    call BLACS_GRIDINFO( ICTXT, NPROW, NPCOL, MYROW, MYCOL )
+    
+    if( MYROW .eq. IRWRIT .and. MYCOL .eq. ICWRIT ) then
+        open( NOUT, file=FILNAM, status='unknown', form='unformatted' )
+        write( NOUT ) M, N
+        if ( present(KPOINT) ) write( NOUT ) KPOINT
+    endif
+    
+    call INFOG2L( IA, JA, DESCA, NPROW, NPCOL, MYROW, MYCOL, &
+                  IIA, JJA, IAROW, IACOL )
+    
+    ICURROW = IAROW
+    ICURCOL = IACOL
+    II = IIA
+    JJ = JJA
+    LDA = DESCA( LLD_ )
+    
+    !! Handle the first block of column separately
+    
+    JN = min( ICEIL( JA, DESCA( NB_ ) ) * DESCA( NB_ ), JA+N-1 )
+    JB = JN-JA+1
+    do H=0, JB-1
+        I_N = min( ICEIL( IA, DESCA( MB_ ) ) * DESCA( MB_ ), IA+M-1 )
+        IB = I_N-IA+1
+        if( ICURROW.eq.IRWRIT .and. ICURCOL.eq.ICWRIT ) then
+            if( MYROW.eq.IRWRIT .and. MYCOL.eq.ICWRIT ) then
+                do K=0, IB-1
+                    write( NOUT ) A( II+K+(JJ+H-1)*LDA )
+                enddo
+            endif
+        else
+            if( MYROW.eq.ICURROW .and. MYCOL.eq.ICURCOL ) then
+                call ZGESD2D( ICTXT, IB, 1, A( II+(JJ+H-1)*LDA ), LDA, &
+                              IRWRIT, ICWRIT )
+            elseif( MYROW.eq.IRWRIT .and. MYCOL.eq.ICWRIT ) then
+                call ZGERV2D( ICTXT, IB, 1, WORK, DESCA( MB_ ), &
+                              ICURROW, ICURCOL )
+                do K=1, IB
+                    write( NOUT ) dble(WORK( K )), DIMAG(WORK( K ))
+                enddo
+            endif
+        endif
+        if( MYROW.eq.ICURROW ) II = II + IB
+        ICURROW = mod( ICURROW+1, NPROW )
+        call BLACS_BARRIER( ICTXT, 'All' )
+        
+        !! Loop over remaining block of rows
+        do I=I_N+1, IA+M-1, DESCA( MB_ )
+            IB = min( DESCA( MB_ ), IA+M-I )
+            if( ICURROW.eq.IRWRIT .and. ICURCOL.eq.ICWRIT ) then
+                if( MYROW.eq.IRWRIT .and. MYCOL.eq.ICWRIT ) then
+                    do K=0, IB-1
+                        write( NOUT ) dble(A( II+K+(JJ+H-1)*LDA )), &
+                                     &DIMAG (A( II+K+(JJ+H-1)*LDA ))
+                    enddo
+                endif
+            else
+                if( MYROW.eq.ICURROW .and. MYCOL.eq.ICURCOL ) then
+                    call ZGESD2D( ICTXT, IB, 1, A( II+(JJ+H-1)*LDA ), &
+                                  LDA, IRWRIT, ICWRIT )
+                elseif( MYROW.eq.IRWRIT .and. MYCOL.eq.ICWRIT ) then
+                    call ZGERV2D( ICTXT, IB, 1, WORK, DESCA( MB_ ), &
+                                  ICURROW, ICURCOL )
+                    do K=1, IB
+                        write( NOUT ) dble(WORK( K )), DIMAG (WORK( K ))
+                    enddo
+               endif
+            endif
+            if( MYROW.eq.ICURROW ) II = II + IB
+            ICURROW = mod( ICURROW+1, NPROW )
+            call BLACS_BARRIER( ICTXT, 'All' )
+        enddo
+        
+        II = IIA
+        ICURROW = IAROW
+    enddo
+    
+    if( MYCOL.eq.ICURCOL ) JJ = JJ + JB
+    ICURCOL = mod( ICURCOL+1, NPCOL )
+    call BLACS_BARRIER( ICTXT, 'All' )
+    
+    !! Loop over remaining column blocks
+    do J=JN+1, JA+N-1, DESCA( NB_ )
+        JB = min(  DESCA( NB_ ), JA+N-J )
+        do H=0, JB-1
+            I_N = min( ICEIL( IA, DESCA( MB_ ) ) * DESCA( MB_ ), IA+M-1)
+            IB = I_N-IA+1
+            if( ICURROW.eq.IRWRIT .and. ICURCOL.eq.ICWRIT ) then
+                if( MYROW.eq.IRWRIT .and. MYCOL.eq.ICWRIT ) then
+                    do K=0, IB-1
+                        write( NOUT ) dble(A( II+K+(JJ+H-1)*LDA )), &
+                                     &DIMAG(A( II+K+(JJ+H-1)*LDA ))
+                    enddo
+                endif
+            else
+                if( MYROW.eq.ICURROW .and. MYCOL.eq.ICURCOL ) then
+                    call ZGESD2D( ICTXT, IB, 1, A( II+(JJ+H-1)*LDA ), &
+                                  LDA, IRWRIT, ICWRIT )
+                elseif( MYROW.eq.IRWRIT .and. MYCOL.eq.ICWRIT ) then
+                    call ZGERV2D( ICTXT, IB, 1, WORK, DESCA( MB_ ), &
+                                  ICURROW, ICURCOL )
+                    do K=1, IB
+                        write( NOUT ) dble(WORK( K )), DIMAG(WORK( K))
+                    enddo
+                endif
+            endif
+            if( MYROW.eq.ICURROW ) II = II + IB
+            ICURROW = mod( ICURROW+1, NPROW )
+            call BLACS_BARRIER( ICTXT, 'All' )
+            
+            !! Loop over remaining block of rows
+            do I=I_N+1, IA+M-1, DESCA( MB_ )
+                IB = min( DESCA( MB_ ), IA+M-I )
+                if( ICURROW.eq.IRWRIT .and. ICURCOL.eq.ICWRIT ) then
+                    if( MYROW.eq.IRWRIT .and. MYCOL.eq.ICWRIT ) then
+                        do K=0, IB-1
+                            write( NOUT ) dble(A( II+K+(JJ+H-1)*LDA )),&
+                                          &DIMAG(A( II+K+(JJ+H-1)*LDA ))
+                        enddo
+                    endif
+                else
+                    if( MYROW.eq.ICURROW .and. MYCOL.eq.ICURCOL ) then
+                        call ZGESD2D(ICTXT, IB,1, A( II+(JJ+H-1)*LDA ),&
+                                     LDA, IRWRIT, ICWRIT )
+                    elseif( MYROW.eq.IRWRIT .and. MYCOL.eq.ICWRIT ) then
+                        call ZGERV2D(ICTXT, IB, 1, WORK, DESCA( MB_ ), &
+                                     ICURROW, ICURCOL )
+                        do K=1, IB
+                            write( NOUT ) dble(WORK(K)), DIMAG(WORK(K))
+                        enddo
+                    endif
+                endif
+                if( MYROW.eq.ICURROW ) II = II + IB
+                ICURROW = mod( ICURROW+1, NPROW )
+                call BLACS_BARRIER( ICTXT, 'All' )
+            enddo
+            
+            II = IIA
+            ICURROW = IAROW
+        enddo
+        
+        if( MYCOL.eq.ICURCOL ) JJ = JJ + JB
+        ICURCOL = mod( ICURCOL+1, NPCOL )
+        call BLACS_BARRIER( ICTXT, 'All' )
+        
+    enddo
+    if( MYROW.eq.IRWRIT .and. MYCOL.eq.ICWRIT ) then
+        close( NOUT )
+    endif
+
+end subroutine PZWRITEEIGVEC
+
+
+subroutine PDWRITEEIGVEC( FILNAM, M, N, A, IA, JA, DESCA, IRWRIT, &
+                          ICWRIT, WORK )
+    ! adapted from PDLAWRITE (ScaLAPACK/tools) originally written by
+    ! Antoine Petitet, August 1995 (petitet@cs.utk.edu)
+    ! adapted by Julie Langou, April 2007 (julie@cs.utk.edu)
+    ! further adapted to write unformatted binary file and adapted to
+    ! F90 by Martin Stoehr, February 2017 (martin.stoehr@uni.lu)
+    !
+    ! Purpose
+    ! =======
+    !
+    ! PDWRITEEIGVEC writes to a file named FILNAMa distributed matrix
+    ! sub(A) denoting A(IA:IA+M-1,JA:JA+N-1). The local pieces are sent
+    ! to and written by the process of coordinates (IRWWRITE, ICWRIT).
+    !
+    !   WORK must be of size >= MB_ = DESCA( MB_ ).
+    !
+    ! ==================================================================
+    
+    integer, intent(in)           :: IA, ICWRIT, IRWRIT, JA, M, N
+    character(len=*), intent(in)  :: FILNAM
+    integer, intent(in)           :: DESCA(:)
+    real(8), intent(in)           :: A(*), WORK(:)
+    
+    integer, parameter  :: NOUT=13, BLOCK_CYCLIC_2D=1, CSRC_=8, &
+                           CTXT_=2, DLEN_=9, DT_=1, LLD_=9, MB_=5, &
+                           M_=3, NB_=6, N_=4, RSRC_=7
+    integer  :: H, I, IACOL, IAROW, IB, ICTXT, ICURCOL, ICURROW, II, &
+                IIA, I_N, J, JB, JJ, JJA, JN, K, LDA, MYCOL, MYROW, &
+                NPCOL, NPROW, ICEIL
+    
+    
+    !! Get grid parameters
+    ICTXT = DESCA( CTXT_ )
+    call BLACS_GRIDINFO( ICTXT, NPROW, NPCOL, MYROW, MYCOL )
+        
+    if( MYROW.eq.IRWRIT .and. MYCOL.eq.ICWRIT ) then
+        open( NOUT, file=FILNAM, status='unknown', form='unformatted' )
+        write( NOUT ) M, N
+    endif
+    
+    call INFOG2L( IA, JA, DESCA, NPROW, NPCOL, MYROW, MYCOL, &
+                  IIA, JJA, IAROW, IACOL )
+    ICURROW = IAROW
+    ICURCOL = IACOL
+    II = IIA
+    JJ = JJA
+    LDA = DESCA( LLD_ )
+    
+    !! Handle the first block of column separately
+    JN = min( ICEIL( JA, DESCA( NB_ ) ) * DESCA( NB_ ), JA+N-1 )
+    JB = JN-JA+1
+    do H=0, JB-1
+        I_N = min( ICEIL( IA, DESCA( MB_ ) ) * DESCA( MB_ ), IA+M-1 )
+        IB = I_N-IA+1
+        if( ICURROW.eq.IRWRIT .and. ICURCOL.eq.ICWRIT ) then
+            if( MYROW.eq.IRWRIT .and. MYCOL.eq.ICWRIT ) then
+                do K=0, IB-1
+                    write( NOUT ) A( II+K+(JJ+H-1)*LDA )
+                enddo
+            endif
+        else
+            if( MYROW.eq.ICURROW .and. MYCOL.eq.ICURCOL ) then
+                call DGESD2D( ICTXT, IB, 1, A( II+(JJ+H-1)*LDA ), LDA, &
+                              IRWRIT, ICWRIT )
+            elseif( MYROW.eq.IRWRIT .and. MYCOL.eq.ICWRIT ) then
+                call DGERV2D( ICTXT, IB, 1, WORK, DESCA( MB_ ), &
+                              ICURROW, ICURCOL )
+                do K=1, IB
+                    write( NOUT ) WORK( K )
+                enddo
+            endif
+        endif
+        if( MYROW.eq.ICURROW ) II = II + IB
+        ICURROW = mod( ICURROW+1, NPROW )
+        call BLACS_BARRIER( ICTXT, 'All' )
+        
+        !! Loop over remaining block of rows
+        do I=I_N+1, IA+M-1, DESCA( MB_ )
+            IB = MIN( DESCA( MB_ ), IA+M-I )
+            if( ICURROW.eq.IRWRIT .and. ICURCOL.eq.ICWRIT ) then
+                if( MYROW.eq.IRWRIT .and. MYCOL.eq.ICWRIT ) then
+                    do K=0, IB-1
+                        write( NOUT ) A( II+K+(JJ+H-1)*LDA )
+                    enddo
+                endif
+            else
+                if( MYROW.eq.ICURROW .and. MYCOL.eq.ICURCOL ) then
+                    call DGESD2D( ICTXT, IB, 1, A( II+(JJ+H-1)*LDA ), &
+                                  LDA, IRWRIT, ICWRIT )
+                elseif( MYROW.eq.IRWRIT .and. MYCOL.eq.ICWRIT ) then
+                    call DGERV2D( ICTXT, IB, 1, WORK, DESCA( MB_ ), &
+                                  ICURROW, ICURCOL )
+                    do K=1, IB
+                        write( NOUT ) WORK( K )
+                    enddo
+                endif
+            endif
+            if( MYROW.eq.ICURROW ) II = II + IB
+            ICURROW = mod( ICURROW+1, NPROW )
+            call BLACS_BARRIER( ICTXT, 'All' )
+        enddo
+        
+        II = IIA
+        ICURROW = IAROW
+    enddo
+    
+    if( MYCOL.eq.ICURCOL ) JJ = JJ + JB
+    ICURCOL = mod( ICURCOL+1, NPCOL )
+    call BLACS_BARRIER( ICTXT, 'All' )
+        
+    !! Loop over remaining column blocks
+    do J = JN+1, JA+N-1, DESCA( NB_ )
+        JB = min(  DESCA( NB_ ), JA+N-J )
+        do H=0, JB-1
+            I_N = min(ICEIL( IA, DESCA( MB_ ) ) * DESCA( MB_ ), IA+M-1)
+            IB = I_N-IA+1
+            if( ICURROW.eq.IRWRIT .and. ICURCOL.eq.ICWRIT ) then
+                if( MYROW.eq.IRWRIT .and. MYCOL.eq.ICWRIT ) then
+                    do K=0, IB-1
+                        write( NOUT ) A( II+K+(JJ+H-1)*LDA )
+                    enddo
+                endif
+            else
+                if( MYROW.eq.ICURROW .and. MYCOL.eq.ICURCOL ) then
+                    call DGESD2D( ICTXT, IB, 1, A( II+(JJ+H-1)*LDA ), &
+                                  LDA, IRWRIT, ICWRIT )
+                elseif( MYROW.eq.IRWRIT .and. MYCOL.eq.ICWRIT ) then
+                    call DGERV2D( ICTXT, IB, 1, WORK, DESCA( MB_ ), &
+                                  ICURROW, ICURCOL )
+                    do K=1, IB
+                        write( NOUT ) WORK( K )
+                    enddo
+                endif
+            endif
+            if( MYROW.eq.ICURROW ) II = II + IB
+            ICURROW = mod( ICURROW+1, NPROW )
+            call BLACS_BARRIER( ICTXT, 'All' )
+            
+            !! Loop over remaining block of rows
+            do I = I_N+1, IA+M-1, DESCA( MB_ )
+                IB = min( DESCA( MB_ ), IA+M-I )
+                if( ICURROW.eq.IRWRIT .and. ICURCOL.eq.ICWRIT ) then
+                    if( MYROW.eq.IRWRIT .and. MYCOL.eq.ICWRIT ) then
+                        do K=0, IB-1
+                            write( NOUT ) A( II+K+(JJ+H-1)*LDA )
+                        enddo
+                    endif
+                else
+                    if( MYROW.eq.ICURROW .and. MYCOL.eq.ICURCOL ) then
+                        call DGESD2D(ICTXT, IB, 1, A( II+(JJ+H-1)*LDA),&
+                                     LDA, IRWRIT, ICWRIT )
+                    elseif( MYROW.eq.IRWRIT .and. MYCOL.eq.ICWRIT ) then
+                        call DGERV2D( ICTXT, IB, 1, WORK, DESCA( MB_ ),&
+                                      ICURROW, ICURCOL )
+                        do K=1, IB
+                            write( NOUT ) WORK( K )
+                        enddo
+                    endif
+                endif
+                if( MYROW.eq.ICURROW ) II = II + IB
+                ICURROW = mod( ICURROW+1, NPROW )
+                call BLACS_BARRIER( ICTXT, 'All' )
+            enddo
+            
+            II = IIA
+            ICURROW = IAROW
+        enddo
+        
+        if( MYCOL.eq.ICURCOL ) JJ = JJ + JB
+        ICURCOL = mod( ICURCOL+1, NPCOL )
+        call BLACS_BARRIER( ICTXT, 'All' )
+    enddo
+    
+    if( MYROW.eq.IRWRIT .and. MYCOL.eq.ICWRIT ) then
+        close( NOUT )
+    endif
+
+end subroutine PDWRITEEIGVEC
 
 
 subroutine exit_blacs_and_finalize(continuation)
@@ -4261,9 +4646,9 @@ end function tostr_dble_
 
 
 
-!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-!!     TIMING & FILE IDENTIFIERS     !!
-!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!!!!!!!!!!!!!!!!!!!!
+!!     TIMING     !!
+!!!!!!!!!!!!!!!!!!!!
 
 subroutine ts(id, always)
     integer, intent(in) :: id
@@ -4280,19 +4665,6 @@ subroutine ts(id, always)
         end if
     end if
 end subroutine ts
-
-
-function get_FileID()
-    integer        :: get_FileID
-    integer, save  :: currentID = minFileID
-    
-    if (currentID > maxFileID) then
-      write(*,*) "error('get_FileID: No more free file identification numbers')"
-    end if
-    get_FileID = currentID
-    currentID = currentID + 1
-    
-end function get_FileID
 
 
 function clock_rate() result(rate)

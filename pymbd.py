@@ -6,8 +6,9 @@ import numpy as np
 try:
     from mbd import mbd
 except ImportError:
-    sys.stderr.write("module mbd not found, trying mbd_scalapack")
+    sys.stderr.write("module mbd not found, trying mbd_scalapack\n")
     from mbd_scalapack import mbd_scalapack as mbd
+    sys.stderr.write("using mbd_scalapack...\n\n")
 
 try:
     from mpi4py import MPI

@@ -4,6 +4,3 @@
 /*.dSYM
 /system.mk
 *.pyc
-/lib_io
-*.a
-*.o
