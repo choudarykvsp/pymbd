@@ -62,3 +62,13 @@ E_MBD = mbd.get_mbd_energy_s(<modus>, \
 mbd.destroy_grid()
 `
 
+### Format of eigenmode/eigenenergy output
+(calling from top-level `get_mbd_energy` instance and in ScaLAPACK framework create output files)
+
+. eigenenergies: formatted text file `mbd_eigenvalues(_reciprocal).out` sorted by k points (if applicable)
+
+. eigenmodes: unformatted binary file `mbd_eigenmodes(_kptX).out` sorted by k points (if applicable)
+    - `mbd_eigenmodes.out`: size 1st dim, size 2nd dim, elements of 1st eigenmode, elements of 2nd eigenmode, ...
+    - `mbd_eigenmodes_kptX.out`: size 1st dim, size 2nd dim, kpointX(1), kpointX(2), kpointX(3), elements of 1st eigenmode on kpoint X, elements of 2nd eigenmode on kpoint X, ...
+
+

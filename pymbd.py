@@ -4,13 +4,6 @@ import json
 import sys
 import numpy as np
 try:
-    from mbd import mbd
-except ImportError:
-    sys.stderr.write("module mbd not found, trying mbd_scalapack\n")
-    from mbd_scalapack import mbd_scalapack as mbd
-    sys.stderr.write("using mbd_scalapack...\n\n")
-
-try:
     from mpi4py import MPI
     ntasks = MPI.COMM_WORLD.Get_size()
     myid = MPI.COMM_WORLD.Get_rank()
@@ -18,6 +11,17 @@ except ImportError:
     sys.stderr.write('warning: Install mpi4py for MPI support\n')
     ntasks = 1
     myid = 0
+
+try:
+    from mbd import mbd
+except ImportError:
+    if (myid == 0):
+        sys.stderr.write("module mbd not found, trying mbd_scalapack\n")
+    
+    from mbd_scalapack import mbd_scalapack as mbd
+    if (myid == 0):
+        sys.stderr.write("using mbd_scalapack...\n\n")
+
 
 mbd.my_task = myid
 mbd.n_tasks = ntasks

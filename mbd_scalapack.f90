@@ -18,44 +18,50 @@ use mbd_helper, only: &
 
 implicit none
 
-!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-!!                                                                   !!
-!!  This is an implementation of the Many-Body Dispersion (MBD)      !!
-!!  dispersion model [Tkatchenko, et al. PRL 108, 236402 (2012)]     !!
-!!  Including vdW(TS) [Tkatchenko, Scheffler PRL 102, 073005 (2009)] !!
-!!  and some advanced additional capabilities for development        !!
-!!  based on code by J. Hermann (FHI) ammended by M. Stoehr (UNI.lu) !!
-!!                                                                   !!
-!!  The code is structured as follows:                               !!
-!!  . vdW(TS) energy                                                 !!
-!!                                                                   !!
-!!  . LAPACK/MPI-based routines to build dipole interaction tensor   !!
-!!  . LAPACK/MPI-based routines for self-consistent screening        !!
-!!  . LAPACK/MPI-based routines for MBD/RPA energy                   !!
-!!                                                                   !!
-!!  . additional tools (development)                                 !!
-!!  . helper functions [LAPACK/MPI framework]                        !!
-!!                                                                   !!
-!!  . vdW(TS) energy (low memory version, less customizability)      !!
-!!                                                                   !!
-!!  . ScaLAPACK-based routines to build dipole interaction tensor    !!
-!!  . ScaLAPACK-based routines for self-consistent screening         !!
-!!  . ScaLAPACK-based routines for MBD energy (TODO: RPA)            !!
-!!  . helper functions [ScaLAPACK framework]                         !!
-!!                                                                   !!
-!!  . dipole-dipole coupling and damping                             !!
-!!  . general operations/routines                                    !!
-!!  . timing                                                         !!
-!!                                                                   !!
-!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!!                                                                    !!
+!!  This is an implementation of the Many-Body Dispersion (MBD)       !!
+!!  dispersion model [Tkatchenko, et al. PRL 108, 236402 (2012)]      !!
+!!  Including vdW(TS) [Tkatchenko, Scheffler PRL 102, 073005 (2009)]  !!
+!!  and some advanced additional capabilities for development         !!
+!!  based on code by J. Hermann (FHI) ammended by M. Stoehr (UNI.lu)  !!
+!!                                                                    !!
+!!  The code is structured as follows:                                !!
+!!  . vdW(TS) energy                                                  !!
+!!                                                                    !!
+!!  . LAPACK/MPI-based routines to build dipole interaction tensor    !!
+!!  . LAPACK/MPI-based routines for self-consistent screening         !!
+!!  . LAPACK/MPI-based routines for MBD/RPA energy                    !!
+!!                                                                    !!
+!!  . additional tools (development)                                  !!
+!!  . helper functions [LAPACK/MPI framework]                         !!
+!!                                                                    !!
+!!  . vdW(TS) energy (low memory version, less customizability)       !!
+!!                                                                    !!
+!!  . ScaLAPACK-based routines to build dipole interaction tensor     !!
+!!  . ScaLAPACK-based routines for self-consistent screening          !!
+!!  . ScaLAPACK-based routines for MBD energy (TODO?: RPA)            !!
+!!  . helper functions [ScaLAPACK framework]                          !!
+!!                                                                    !!
+!!  . dipole-dipole coupling and damping                              !!
+!!  . general operations/routines                                     !!
+!!  . timing                                                          !!
+!!                                                                    !!
+!!  Available eigensolvers for CFDM -- in both frameworks             !!
+!!  (controlled via module variable 'eigensolver' = ):                !!
+!!  . 'qr   ': standard (P)DSYEV/(P)ZHEEV QR algorithm [default]      !!
+!!  . 'dandc': Divide & Conquer algorithm (P)DSYEVD/(P)ZHEEVD         !!
+!!  . 'mrrr ': MRRR algorithm (P)DSYEVR/(P)ZHEEVR                     !!
+!!                                                                    !!
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 
 
 
 
-real(8), parameter :: bohr = 0.529177249d0
+real(8), parameter  :: bohr = 0.529177249d0
 
-real(8) :: &
+real(8)  :: &
     param_ts_energy_accuracy = 1.d-10, &
     param_ts_cutoff_radius = 50.d0/bohr, &
     param_dipole_low_dim_cutoff = 100.d0/bohr, &
@@ -64,27 +70,29 @@ real(8) :: &
     param_ewald_real_cutoff_scaling = 1.d0, &
     param_ewald_rec_cutoff_scaling = 1.d0, &
     param_k_grid_shift = 0.5d0
-logical :: &
+logical  :: &
     param_ewald_on = .true., &
     param_zero_negative_eigs = .false.
-integer :: &
+integer  :: &
     param_mbd_nbody_max = 3, &
     param_rpa_order_max = 10
-logical :: &
+logical  :: &
     param_vacuum_axis(3) = (/ .false., .false., .false. /)
 
-integer :: n_grid_omega
-real(8), allocatable :: omega_grid(:), omega_grid_w(:)
+integer               :: n_grid_omega
+real(8), allocatable  :: omega_grid(:), omega_grid_w(:)
 
-integer, parameter :: n_timestamps = 100
-logical :: measure_time = .true.
-integer :: timestamps(n_timestamps), ts_counts(n_timestamps)
-integer :: ts_cnt, ts_rate, ts_cnt_max, ts_aid
+integer, parameter  :: n_timestamps = 100
+logical             :: measure_time = .true.
+integer             :: timestamps(n_timestamps), ts_counts(n_timestamps)
+integer             :: ts_cnt, ts_rate, ts_cnt_max, ts_aid
 
-integer :: my_task, n_tasks
+integer  :: my_task, n_tasks
 
-integer, parameter :: minFileID = 20
-integer, parameter :: maxFileID = 65535
+integer, parameter  :: minFileID = 20
+integer, parameter  :: maxFileID = 65535
+
+character(len=5)  :: eigensolver = "qr   "
 
 interface operator(.cprod.)
     module procedure cart_prod_
@@ -128,7 +136,9 @@ end interface
 !             ZGETRI, ZGEEV, ZGEEB, BLACS_BARRIER, BLACS_GRIDINFO, &
 !             INFOG2L, DGERV2D, DGESD2D, ICEIL, PDGETRI, PDSYEV, &
 !             numroc, PZHEEV, BLACS_PINFO, BLACS_GET, BLACS_GRIDINIT, &
-!             descinit, PDGETRF, DGSUM2D, BLACS_GRIDEXIT, pdelget
+!             descinit, PDGETRF, DGSUM2D, BLACS_GRIDEXIT, pdelget, &
+!             PDSYEVD, PZHEEVD, PDSYEVR, PZHEEVR, DSYEVD, ZHEEVD, &
+!             DSYEVR, ZHEEVR
 
 contains
 
@@ -919,37 +929,76 @@ end function
 
 function get_mbd_energy(mode, version, xyz, alpha_0, omega, &
             supercell, k_grid, unit_cell, R_vdw, beta, a, overlap, C6, &
-            damping_custom, potential_custom) result(ene)
-    character(len=*), intent(in) :: mode, version
-    real(8), intent(in) :: &
+            damping_custom, potential_custom) &
+            result(ene)
+    character(len=*), intent(in)  :: mode, version
+    real(8), intent(in)  :: &
         xyz(:, :), &
         alpha_0(size(xyz, 1)), &
         omega(size(xyz, 1))
-    integer, intent(in), optional :: supercell(3)
-    real(8), intent(in), optional :: &
+    integer, intent(in), optional  :: supercell(3)
+    real(8), intent(in), optional  :: &
         k_grid(:, :), &
         unit_cell(3, 3)
-    real(8), intent(in), optional :: &
+    real(8), intent(in), optional  :: &
         R_vdw(size(xyz, 1)), &
         beta, a, &
         overlap(size(xyz, 1), size(xyz, 1)), &
         C6(size(xyz, 1)), &
         damping_custom(size(xyz, 1), size(xyz, 1)), &
         potential_custom(size(xyz, 1), size(xyz, 1), 3, 3)
-    real(8) :: ene
-
-    logical :: is_parallel, do_rpa, is_reciprocal, is_crystal
-    real(8), allocatable :: alpha(:, :)
-
+    real(8)  :: ene
+    
+    logical  :: is_parallel, do_rpa, is_reciprocal, is_crystal
+    real(8), allocatable     :: alpha(:, :), mode_enes(:,:)
+    real(8), allocatable     :: modes(:,:)
+    complex(8), allocatable  :: modes_k(:,:,:)
+    integer                  :: i_kpt
+    
+    
     is_parallel = is_in('P', mode)
     is_crystal = is_in('C', mode)
     do_rpa = is_in('Q', mode)
     is_reciprocal = is_in('R', mode)
+    call print_log('---------------------------------------------------&
+                   &------------')
+    call print_log('Framework:   LAPACK/MPI')
+    selectcase(trim(eigensolver))
+        case('qr')
+            call print_log('eigensolver: QR algorithm')
+        case('dandc')
+            call print_log('eigensolver: Divide and Conquer')
+        case('mrrr')
+            call print_log('eigensolver: Multiple Relatively Robust &
+                           &Representations (MRRR)')
+    endselect
+    call print_log('---------------------------------------------------&
+                   &------------')
     if (.not. is_crystal) then
         if (.not. do_rpa) then
+            if ( is_in('E', mode) ) then
+                if ( allocated(mode_enes) ) deallocate(mode_enes)
+                allocate( mode_enes(1, 3*size(xyz, 1)) )
+            endif
+            if ( is_in('V', mode) ) then
+                if ( allocated(modes) ) deallocate(modes)
+                allocate( modes(3*size(xyz, 1), 3*size(xyz, 1)) )
+            endif
+            
             ene = get_single_mbd_energy(blanked(mode,'R'), version,xyz,&
                            alpha_0, omega, R_vdw, beta, a, overlap, C6,&
-                           damping_custom, potential_custom, unit_cell)
+                           damping_custom, potential_custom, unit_cell,&
+                           mode_enes(1,:), modes)
+            
+            if ( is_in('E', mode) ) then
+                call write_eigenenergies(mode_enes(1,:), &
+                                         "mbd_eigenvalues.out")
+                deallocate(mode_enes)
+            endif
+            if ( is_in('V', mode) ) then
+                call DWRITEEIGVEC(modes, 'mbd_eigenmodes.out')
+                deallocate(modes)
+            endif
         else
             allocate (alpha(0:n_grid_omega, size(alpha_0)))
             alpha = alpha_dynamic_ts_all(blanked(mode,'R'),n_grid_omega,&
@@ -961,9 +1010,40 @@ function get_mbd_energy(mode, version, xyz, alpha_0, omega, &
         end if
     else
         if (is_reciprocal) then
+            if ( is_in('E', mode) ) then
+                if ( allocated(mode_enes) ) deallocate(mode_enes)
+                allocate( mode_enes(size(k_grid, 1), 3*size(xyz, 1)) )
+            endif
+            if ( is_in('V', mode) ) then
+                if ( allocated(modes) ) deallocate(modes)
+                allocate( modes_k(size(k_grid, 1), 3*size(xyz, 1), &
+                                  3*size(xyz, 1)) )
+            endif
+            
             ene = get_reciprocal_mbd_energy(mode, version, xyz, alpha_0,&
                            omega, k_grid, unit_cell, R_vdw, beta, a, &
-                           overlap, C6, damping_custom, potential_custom)
+                           overlap, C6, damping_custom,potential_custom,&
+                           mode_enes, modes_k)
+            
+            if ( is_in('E', mode) ) then
+                do i_kpt = 1, size(k_grid, 1)
+                    call write_eigenenergies(mode_enes(i_kpt,:), &
+                               "mbd_eigenvalues_reciprocal.out", &
+                                         k_point=k_grid(i_kpt, :))
+                enddo
+                deallocate(mode_enes)
+            endif
+            if ( is_in('V', mode) ) then
+                do i_kpt = 1, size(k_grid, 1)
+                    if (is_parallel) then
+                        if (my_task /= modulo(i_kpt, n_tasks)) cycle
+                    endif
+                    call ZWRITEEIGVEC(modes_k(i_kpt, :, :), &
+                     "mbd_eigenmodes_kpt"//trim(tostr(i_kpt))//".out", &
+                     k_grid(i_kpt,:))
+                enddo
+                deallocate(modes_k)
+            endif
         else
             ene = get_supercell_mbd_energy(mode, version, xyz, alpha_0, &
                          omega, unit_cell, supercell, R_vdw, beta, a, C6)
@@ -1204,7 +1284,6 @@ function get_reciprocal_mbd_energy(mode, version, xyz, alpha_0, omega, &
     else
         mute = ''
     end if
-
     alpha_ts = alpha_dynamic_ts_all('O', n_grid_omega, alpha_0, omega=omega)
     ene = 0.d0
     if (get_eigenvalues .and. get_eigenvectors) then
@@ -1271,6 +1350,7 @@ function get_reciprocal_mbd_energy(mode, version, xyz, alpha_0, omega, &
                     mode_enes=mode_enes(i_kpt, :), &
                     modes=modes(i_kpt, :, :))
             else
+                write(*,*) "starting get_single_reciprocal_mbd_ene..."
                 ene = ene+get_single_reciprocal_mbd_ene( &
                     blanked('P', mode)//mute, &
                     version, &
@@ -1361,15 +1441,15 @@ function get_single_reciprocal_mbd_ene(mode, version, xyz, alpha_0, omega, &
                 omega(i_atom)*omega(j_atom) &
                 *sqrt(alpha_0(i_atom)*alpha_0(j_atom))* &
                 relay(i+1:i+3, j+1:j+3)
-        end do
-    end do
+        enddo
+    enddo
     do i_atom = 1, size(xyz, 1)
         do i_xyz = 1, 3
             i = 3*(i_atom-1)+i_xyz
             relay(i, i) = relay(i, i)+omega(i_atom)**2
             ! relay = w^2+sqrt(a*a)*w*w*T
-        end do
-    end do
+        enddo
+    enddo
     call ts(22)
     if (.not. is_parallel .or. my_task == 0) then
         if (get_eigenvectors) then
@@ -1377,19 +1457,19 @@ function get_single_reciprocal_mbd_ene(mode, version, xyz, alpha_0, omega, &
             modes = relay
         else
             call sdiagonalize('N', relay, eigs)
-        end if
-    end if
+        endif
+    endif
     ! MPI code begin
     if (is_parallel) then
         call broadcast(relay)
         call broadcast(eigs)
-    end if
+    endif
     ! MPI code end
     call ts(-22)
     if (get_eigenvalues) then
         mode_enes(:) = 0.d0
         where (eigs > 0) mode_enes = sqrt(eigs)
-    end if
+    endif
     n_negative_eigs = count(eigs(:) < 0)
     if (n_negative_eigs > 0) then
         call print_warning( &
@@ -1397,7 +1477,7 @@ function get_single_reciprocal_mbd_ene(mode, version, xyz, alpha_0, omega, &
             " negative eigenvalues" &
         )
         if (param_zero_negative_eigs) where (eigs < 0) eigs = 0.d0
-    end if
+    endif
     ene = 1.d0/2*sum(sqrt(eigs))-3.d0/2*sum(omega)
 end function get_single_reciprocal_mbd_ene
 
@@ -1886,19 +1966,67 @@ subroutine diagonalize_sym_dble_(mode, A, eigs)
     real(8), intent(inout) :: A(:, :)
     real(8), intent(out) :: eigs(size(A, 1))
     
-    real(8), allocatable :: work_arr(:)
-    integer :: n
-    real(8) :: n_work_arr
-    integer :: error_flag
+    real(8), allocatable :: work_arr(:), vecs(:,:)
+    integer :: n, vl, vu, il, iu, nvals
+    integer, allocatable  :: iwork_arr(:), isupp(:)
+    integer :: error_flag, lwork, liwork
     
     n = size(A, 1)
-    call DSYEV(mode, "U", n, A, n, eigs, n_work_arr, -1, error_flag)
-    allocate (work_arr(nint(n_work_arr)))
-    call DSYEV(mode, "U", n, A, n, eigs, work_arr, size(work_arr), error_flag)
+    if ( allocated(work_arr) ) deallocate(work_arr)
+    allocate( work_arr(1) )
+    selectcase(trim(eigensolver))
+        case("qr")        !! QR algorithm: less fast, minimal memory requirement
+            call DSYEV(mode, "U", n, A, n, eigs, work_arr, -1, error_flag)
+            lwork = nint(work_arr(1))
+            deallocate(work_arr)
+            allocate (work_arr(lwork))
+            call DSYEV(mode, "U", n, A, n, eigs, work_arr, lwork, error_flag)
+        
+        case("dandc")     !! Divide & Conquer: fast, high memory requirement
+            if ( allocated(iwork_arr) ) deallocate(iwork_arr)
+            allocate( iwork_arr(1) )
+            call DSYEVD(mode, "U", n, A, n, eigs, work_arr, -1, &
+                        iwork_arr, -1, error_flag)
+            lwork = nint(work_arr(1))
+            liwork = iwork_arr(1)
+            deallocate(work_arr)
+            deallocate(iwork_arr)
+            allocate (work_arr(lwork))
+            allocate (iwork_arr(liwork))
+            call DSYEVD(mode, "U", n, A, n, eigs, work_arr, lwork, &
+                       iwork_arr, liwork, error_flag)
+            if ( allocated(iwork_arr) ) deallocate(iwork_arr)
+        
+        case("mrrr")      !! MRRR algorithm: fast, medium memory requirement
+            if ( allocated(isupp) ) deallocate(isupp)
+            allocate( isupp(2*n), stat=error_flag)
+            if ( allocated(vecs) ) deallocate(vecs)
+            allocate( vecs(n,n) )
+            if ( allocated(iwork_arr) ) deallocate(iwork_arr)
+            allocate( iwork_arr(1) )
+            call DSYEVR(mode, "A", "U", n, A, n, vl, vu, il, iu, 1.d-16, &
+                        nvals, eigs, vecs, n, isupp, work_arr, -1, &
+                        iwork_arr, -1, error_flag)
+            lwork = nint(work_arr(1))
+            liwork = iwork_arr(1)
+            deallocate(work_arr)
+            deallocate(iwork_arr)
+            allocate (work_arr(lwork))
+            allocate (iwork_arr(liwork))
+            call DSYEVR(mode, "A", "U", n, A, n, vl, vu, il, iu, 1.d-16, &
+                        nvals, eigs, vecs, n, isupp, work_arr, lwork, &
+                        iwork_arr, liwork, error_flag)
+            A = vecs
+            deallocate(iwork_arr)
+            deallocate(isupp)
+            deallocate(vecs)
+    
+    endselect
     deallocate (work_arr)
+    
     if (error_flag /= 0) then
         call print_log( &
-            "DSYEV failed in module mbd with error code " &
+            "DSYEVx failed in module mbd with error code " &
             //trim(tostr(error_flag)))
     endif
 end subroutine
@@ -1985,24 +2113,85 @@ subroutine diagonalize_he_cmplx_(mode, A, eigs)
     complex(8), intent(inout) :: A(:, :)
     real(8), intent(out) :: eigs(size(A, 1))
 
-    complex(8), allocatable :: work(:)
-    complex(8) :: lwork_cmplx
-    real(8), allocatable :: rwork(:)
-    integer :: n, lwork
+    complex(8), allocatable  :: work(:), vecs(:,:)
+    real(8), allocatable     :: rwork(:)
+    integer, allocatable     :: iwork(:), isupp(:)
+    integer :: vl, vu, il, iu, nvals
+    integer :: n, lwork, lrwork, liwork
     integer :: error_flag
     integer, external :: ILAENV
-
+    
     n = size(A, 1)
-    allocate (rwork(max(1, 3*n-2)))
-    call ZHEEV(mode, "U", n, A, n, eigs, lwork_cmplx, -1, rwork, error_flag)
-    lwork = nint(dble(lwork_cmplx))
-    allocate (work(lwork))
-    call ZHEEV(mode, "U", n, A, n, eigs, work, lwork, rwork, error_flag)
-    deallocate (rwork)
-    deallocate (work)
+    if ( allocated(rwork) ) deallocate(rwork)
+    if ( allocated(work) ) deallocate(work)
+    selectcase(trim(eigensolver))
+        case("qr")        !! QR algorithm: less fast, minimal memory consumption
+            allocate (rwork(max(1, 3*n-2)))
+            allocate(work(1))
+            call ZHEEV(mode, "U", n, A, n, eigs, work, -1, rwork, &
+                       error_flag)
+            lwork = nint(dble(work(1)))
+            deallocate(work)
+            allocate (work(lwork))
+            call ZHEEV(mode, "U", n, A, n, eigs, work, lwork, rwork, &
+                       error_flag)
+        
+        case("dandc")     !! Divide & Conquer: fast, high memory consumption
+            allocate(work(1))
+            allocate(rwork(1))
+            if ( allocated(iwork) ) deallocate(iwork)
+            allocate(iwork(1))
+            call ZHEEVD(mode, "U", n, A, n, eigs, work, -1, rwork, -1, &
+                        iwork, -1, error_flag)
+            lwork = nint( dble( work(1) ) )
+            lrwork = nint( rwork(1) )
+            liwork = iwork(1)
+            deallocate(work)
+            deallocate(rwork)
+            deallocate(iwork)
+            allocate (work(lwork))
+            allocate (rwork(lrwork))
+            allocate (iwork(liwork))
+            call ZHEEVD(mode, "U", n, A, n, eigs, work, lwork, rwork, &
+                        lrwork, iwork, liwork, error_flag)
+            deallocate(iwork)
+        
+        case("mrrr")      !! MRRR algorithm: fast, medium memory consumption
+            allocate(work(1))
+            allocate(rwork(1))
+            if ( allocated(iwork) ) deallocate(iwork)
+            allocate(iwork(1))
+            if ( allocated(vecs) ) deallocate(vecs)
+            allocate( vecs(n,n) )
+            if ( allocated(isupp) ) deallocate(isupp)
+            allocate( isupp(2*n) )
+            call ZHEEVR(mode, "A", "U", n, A, n, vl, vu, il, iu, 1.d-16, &
+                        nvals, eigs, vecs, n, isupp, work, -1, rwork, &
+                        -1, iwork, -1, error_flag)
+            lwork = nint( dble( work(1) ) )
+            lrwork = nint( rwork(1) )
+            liwork = iwork(1)
+            deallocate(work)
+            deallocate(rwork)
+            deallocate(iwork)
+            allocate (work(lwork))
+            allocate (rwork(lrwork))
+            allocate (iwork(liwork))
+            call ZHEEVR(mode, "A", "U", n, A, n, vl, vu, il, iu, 1.d-16, &
+                        nvals, eigs, vecs, n, isupp, work, lwork, rwork, &
+                        lrwork, iwork, liwork, error_flag)
+            A = vecs
+            deallocate(iwork)
+            deallocate(isupp)
+            deallocate(vecs)
+        
+    endselect
+    deallocate(rwork)
+    deallocate(work)
+    
     if (error_flag /= 0) then
         call print_error( &
-            "ZHEEV failed in module mbd with error code " &
+            "ZHEEVx failed in module mbd with error code " &
             //trim(tostr(error_flag)))
     endif
 end subroutine
@@ -2954,6 +3143,21 @@ function get_mbd_energy_s(mode, version, xyz, alpha_0, omega, supercell, &
     is_parallel = is_in('P', mode)
     is_crystal = is_in('C', mode)
     is_reciprocal = is_in('R', mode)
+    call print_log('---------------------------------------------------&
+                   &------------')
+    call print_log('Framework:   ScaLAPACK')
+    selectcase(trim(eigensolver))
+        case('qr')
+            call print_log('eigensolver: QR algorithm')
+        case('dandc')
+            call print_log('eigensolver: Divide and Conquer')
+        case('mrrr')
+            call print_log('eigensolver: Multiple Relatively Robust &
+                           &Representations (MRRR)')
+    endselect
+    call print_log('---------------------------------------------------&
+                   &------------')
+    
     if (.not. is_crystal) then
         ene = get_single_mbd_energy_s(blanked('R',mode), version, xyz, &
                                alpha_0, omega, R_vdw=R_vdw, beta=beta, &
@@ -3034,6 +3238,8 @@ function get_supercell_mbd_energy_s(mode, version, xyz, alpha_0, omega, &
     allocate (R_vdw_super(n_cells*size(R_vdw)))
     allocate (C6_super(n_cells*size(C6)))
     idx_cell = (/ 0, 0, -1 /)
+    !! TODO: we could switch to simple MPI loop parallelism
+    !!       (and subsequent broadcast) for the following
     do i_cell = 1, n_cells
         call shift_cell(idx_cell, (/ 0, 0, 0 /), supercell-1)
         R_cell = matmul(idx_cell, unit_cell)
@@ -3143,11 +3349,13 @@ function get_single_mbd_energy_s(mode, version, xyz, alpha_0, omega, &
     real(8), dimension(:,:), allocatable  :: my_relay, my_evecs
     real(8), dimension(:), allocatable    :: my_cfdm_work, my_write_work
     integer, dimension(:), allocatable    :: my_row2glob, my_col2glob
+    integer, dimension(:), allocatable    :: my_cfdm_iwork
+    integer  :: vl, vu, il, iu, nvals, nvecs
     integer  :: n_tasks_bak, size1n, size3n, my_task_blacs
     integer  :: cfdm_ctxt, nprows, npcols, my_prow, my_pcol, fb3n, fb1n
     integer  :: my_nrows3n, my_nrows1n, my_ncols3n, my_ncols1n, numroc
     integer, dimension(9) :: desc3n3n, desc1n
-    integer  :: my_cfdm_lwork, n_tasks_blacs
+    integer  :: my_cfdm_lwork, my_cfdm_liwork, n_tasks_blacs
     
     real(8)  :: eigs(3*size(xyz, 1))
     integer  :: i_local, j_local, i_atom, j_atom, i_xyz, i, j
@@ -3255,20 +3463,58 @@ function get_single_mbd_energy_s(mode, version, xyz, alpha_0, omega, &
         if ( allocated(my_evecs) ) deallocate(my_evecs)
         allocate( my_evecs(my_nrows3n, my_ncols3n), stat=ierr)
         
-        !! work space query
-        call PDSYEV('V', 'U', size3n, my_relay, 1, 1, desc3n3n, eigs, &
-                    my_evecs, 1, 1, desc3n3n, my_cfdm_work, -1, ierr)
+        selectcase(eigensolver)
+            case("qr")        !! QR algorithm (slow, minimum memory)
+                call PDSYEV('V', 'U', size3n, my_relay, 1, 1, desc3n3n, &
+                            eigs, my_evecs, 1, 1, desc3n3n, my_cfdm_work, &
+                            -1, ierr)
+                my_cfdm_lwork = nint( my_cfdm_work(1) )
+                if ( allocated(my_cfdm_work) ) deallocate(my_cfdm_work)
+                allocate( my_cfdm_work(my_cfdm_lwork), stat=ierr )
+                call PDSYEV('V', 'U', size3n, my_relay, 1, 1, desc3n3n, &
+                            eigs, my_evecs, 1, 1, desc3n3n, my_cfdm_work, &
+                            my_cfdm_lwork, ierr)
+            
+            case("dandc")     !! Divide & Conquer (fast, large memory)
+                if ( allocated(my_cfdm_iwork) ) deallocate(my_cfdm_iwork)
+                allocate( my_cfdm_iwork(1), stat=ierr )
+                call PDSYEVD('V', 'U', size3n, my_relay, 1, 1, desc3n3n, &
+                             eigs, my_evecs, 1, 1, desc3n3n, my_cfdm_work, &
+                             -1, my_cfdm_iwork, -1, ierr)
+                my_cfdm_lwork = nint( my_cfdm_work(1) )
+                my_cfdm_liwork = my_cfdm_iwork(1)
+                if ( allocated(my_cfdm_work) ) deallocate(my_cfdm_work)
+                allocate( my_cfdm_work(my_cfdm_lwork), stat=ierr )
+                if ( allocated(my_cfdm_iwork) ) deallocate(my_cfdm_iwork)
+                allocate( my_cfdm_iwork(my_cfdm_liwork), stat=ierr )
+                call PDSYEVD('V', 'U', size3n, my_relay, 1, 1, desc3n3n, &
+                             eigs, my_evecs, 1, 1, desc3n3n, my_cfdm_work, &
+                             my_cfdm_lwork, my_cfdm_iwork, my_cfdm_liwork, &
+                             ierr)
+                if ( allocated(my_cfdm_iwork) ) deallocate(my_cfdm_iwork)
+            
+            case("mrrr")      !! MRRR algorithm (fast, low memory)
+                if ( allocated(my_cfdm_iwork) ) deallocate(my_cfdm_iwork)
+                allocate( my_cfdm_iwork(1), stat=ierr )
+                call PDSYEVR('V', 'A', 'U', size3n, my_relay, 1, 1, &
+                             desc3n3n, vl, vu, il, iu, nvals, nvecs, eigs, &
+                             my_evecs, 1, 1, desc3n3n, my_cfdm_work, -1, &
+                             my_cfdm_iwork, -1, ierr)
+                my_cfdm_lwork = nint( my_cfdm_work(1) )
+                my_cfdm_liwork = my_cfdm_iwork(1)
+                if ( allocated(my_cfdm_work) ) deallocate(my_cfdm_work)
+                allocate( my_cfdm_work(my_cfdm_lwork), stat=ierr )
+                if ( allocated(my_cfdm_iwork) ) deallocate(my_cfdm_iwork)
+                allocate( my_cfdm_iwork(my_cfdm_liwork), stat=ierr )
+                call PDSYEVR('V', 'A', 'U', size3n, my_relay, 1, 1, &
+                             desc3n3n, vl, vu, il, iu, nvals, nvecs, eigs, &
+                             my_evecs, 1, 1, desc3n3n, my_cfdm_work, &
+                             my_cfdm_lwork, my_cfdm_iwork, my_cfdm_liwork, &
+                             ierr)
+                if ( allocated(my_cfdm_iwork) ) deallocate(my_cfdm_iwork)
+        endselect
         
-        my_cfdm_lwork = nint( my_cfdm_work(1) )
-        if ( allocated(my_cfdm_work) ) deallocate(my_cfdm_work)
-        allocate(my_cfdm_work(my_cfdm_lwork))
-        
-        !! solve eigenvalue (+eigenvector) problem
-        call PDSYEV('V', 'U', size3n, my_relay, 1, 1, desc3n3n, eigs, &
-                    my_evecs, 1, 1, desc3n3n, my_cfdm_work, &
-                    my_cfdm_lwork, ierr)
-        
-        !! write eigenvectors to output file (see scalapack_io.f)
+        !! write eigenvectors to output file
         if (allocated(my_write_work)) deallocate(my_write_work)
         allocate(my_write_work(fb3n), stat=ierr)
         call PDWRITEEIGVEC('mbd_eigenmodes.out', size3n, size3n, my_evecs, &
@@ -3278,21 +3524,61 @@ function get_single_mbd_energy_s(mode, version, xyz, alpha_0, omega, &
     else
         !! allocate dummy for eigenvectors
         if ( allocated(my_evecs) ) deallocate(my_evecs)
-        allocate( my_evecs(1,1), stat=ierr)
+        allocate( my_evecs(1,1), stat=ierr )
         
-        !! work space query
-        call PDSYEV('N', 'U', size3n, my_relay, 1, 1, desc3n3n, eigs, &
-                    my_evecs, 1, 1, desc3n3n, my_cfdm_work, -1, ierr)
-        
-        my_cfdm_lwork = nint( my_cfdm_work(1) )
-        if ( allocated(my_cfdm_work) ) deallocate(my_cfdm_work)
-        allocate(my_cfdm_work(my_cfdm_lwork))
-        
-        !! solve eigenvalue problem
-        call PDSYEV('N', 'U', size3n, my_relay, 1, 1, desc3n3n, eigs, &
-                    my_evecs, 1, 1, desc3n3n, my_cfdm_work, &
-                    my_cfdm_lwork, ierr)
-        
+        selectcase(eigensolver)
+            case("qr")
+                !! work space query (for QR algorithm)
+                call PDSYEV('N', 'U', size3n, my_relay, 1, 1, desc3n3n, &
+                            eigs, my_evecs, 1, 1, desc3n3n, my_cfdm_work, &
+                            -1, ierr)
+                my_cfdm_lwork = nint( my_cfdm_work(1) )
+                if ( allocated(my_cfdm_work) ) deallocate(my_cfdm_work)
+                allocate( my_cfdm_work(my_cfdm_lwork), stat=ierr )
+                call PDSYEV('N', 'U', size3n, my_relay, 1, 1, desc3n3n, &
+                            eigs, my_evecs, 1, 1, desc3n3n, my_cfdm_work, &
+                            my_cfdm_lwork, ierr)
+                
+            case("dandc")
+                !! work space query (for Divide & Conquer algorithm)
+                if ( allocated(my_cfdm_iwork) ) deallocate(my_cfdm_iwork)
+                allocate( my_cfdm_iwork(1), stat=ierr )
+                call PDSYEVD('N', 'U', size3n, my_relay, 1, 1, desc3n3n, &
+                             eigs, my_evecs, 1, 1, desc3n3n, my_cfdm_work, &
+                             -1, my_cfdm_iwork, -1, ierr)
+                my_cfdm_lwork = nint( my_cfdm_work(1) )
+                my_cfdm_liwork = my_cfdm_iwork(1)
+                if ( allocated(my_cfdm_work) ) deallocate(my_cfdm_work)
+                allocate( my_cfdm_work(my_cfdm_lwork), stat=ierr )
+                if ( allocated(my_cfdm_iwork) ) deallocate(my_cfdm_iwork)
+                allocate( my_cfdm_iwork(my_cfdm_liwork), stat=ierr )
+                call PDSYEVD('N', 'U', size3n, my_relay, 1, 1, desc3n3n, &
+                             eigs, my_evecs, 1, 1, desc3n3n, my_cfdm_work, &
+                             my_cfdm_lwork, my_cfdm_iwork, my_cfdm_liwork, &
+                             ierr)
+                if ( allocated(my_cfdm_iwork) ) deallocate(my_cfdm_iwork)
+                
+            case("mrrr")
+                !! work space query (for MRRR algorithm)
+                if ( allocated(my_cfdm_iwork) ) deallocate(my_cfdm_iwork)
+                allocate( my_cfdm_iwork(1), stat=ierr )
+                call PDSYEVR('N', 'A', 'U', size3n, my_relay, 1, 1, &
+                             desc3n3n, vl, vu, il, iu, nvals, nvecs, eigs, &
+                             my_evecs, 1, 1, desc3n3n, my_cfdm_work, -1, &
+                             my_cfdm_iwork, -1, ierr)
+                my_cfdm_lwork = nint( my_cfdm_work(1) )
+                my_cfdm_liwork = my_cfdm_iwork(1)
+                if ( allocated(my_cfdm_work) ) deallocate(my_cfdm_work)
+                allocate( my_cfdm_work(my_cfdm_lwork), stat=ierr )
+                if ( allocated(my_cfdm_iwork) ) deallocate(my_cfdm_iwork)
+                allocate( my_cfdm_iwork(my_cfdm_liwork), stat=ierr )
+                call PDSYEVR('N', 'A', 'U', size3n, my_relay, 1, 1, &
+                             desc3n3n, vl, vu, il, iu, nvals, nvecs, eigs, &
+                             my_evecs, 1, 1, desc3n3n, my_cfdm_work, &
+                             my_cfdm_lwork, my_cfdm_iwork, my_cfdm_liwork, &
+                             ierr)
+                if ( allocated(my_cfdm_iwork) ) deallocate(my_cfdm_iwork)
+        endselect
     endif
     !! deallocations
     if ( allocated(my_evecs) ) deallocate(my_evecs)
@@ -3407,7 +3693,7 @@ function get_single_reciprocal_mbd_ene_s(mode, version, xyz, alpha_0, &
     !!                C: periodic boundary conditions
     !!                R: use reciprocal space formalism
     !!                E: output eigenvalues to file
-    !!                V: return eigenvectors to file (TODO: DEBUG)
+    !!                V: return eigenvectors to file (TODO: check output)
     !! version:   which damping to use for dipole-dipole coupling
     !! xyz:       atomic positions [a.u.]
     !! alpha_0:   (rescaled and screened) isotropic atomic polarizabilities
@@ -3476,18 +3762,20 @@ function get_single_reciprocal_mbd_ene_s(mode, version, xyz, alpha_0, &
     complex(8), dimension(:), allocatable    :: my_write_work
     real(8), dimension(:), allocatable       :: my_cfdm_rwork
     integer, dimension(:), allocatable       :: my_row2glob, my_col2glob
-    integer :: n_tasks_bak, size1n, size3n, my_task_blacs, n_tasks_blacs
-    integer :: cfdm_ctxt, nprows, npcols, my_prow, my_pcol, fb3n, fb1n
-    integer :: my_nrows3n, my_nrows1n, my_ncols3n, my_ncols1n, numroc
-    integer, dimension(9) :: desc3n3n, desc1n
+    integer, dimension(:), allocatable       :: my_cfdm_iwork
+    integer  :: vl, vu, il, iu, nvals, nvecs
+    integer  :: n_tasks_bak, size1n, size3n, my_task_blacs, n_tasks_blacs
+    integer  :: cfdm_ctxt, nprows, npcols, my_prow, my_pcol, fb3n, fb1n
+    integer  :: my_nrows3n, my_nrows1n, my_ncols3n, my_ncols1n, numroc
+    integer, dimension(9)  :: desc3n3n, desc1n
     
-    integer :: my_cfdm_lwork, my_cfdm_lrwork
+    integer  :: my_cfdm_lwork, my_cfdm_lrwork, my_cfdm_liwork
     
-    real(8) :: eigs(3*size(xyz, 1))
-    integer :: i_local, j_local, i_atom, j_atom, i_xyz, i, j
-    integer :: n_negative_eigs, ierr, kptID, nrows_max, ncols_max
-    logical :: get_eigenvalues, get_eigenvectors, io_proc, &
-               output_data, fexists
+    real(8)  :: eigs(3*size(xyz, 1))
+    integer  :: i_local, j_local, i_atom, j_atom, i_xyz, i, j
+    integer  :: n_negative_eigs, ierr, kptID, nrows_max, ncols_max
+    logical  :: get_eigenvalues, get_eigenvectors, io_proc, &
+                output_data, fexists
     
     
     get_eigenvalues = is_in('E', mode)
@@ -3605,28 +3893,76 @@ function get_single_reciprocal_mbd_ene_s(mode, version, xyz, alpha_0, &
         if ( allocated(my_evecs) ) deallocate(my_evecs)
         allocate( my_evecs(my_nrows3n, my_ncols3n), stat=ierr)
         
-!        !! work space query (alternative manual definition)
-!        call PZHEEV('V', 'U', size3n, my_relay, 1, 1, desc3n3n, eigs, &
-!                    my_evecs, 1, 1, desc3n3n, my_cfdm_work, -1, &
-!                    my_cfdm_rwork, -1, ierr)
-!        
-!        my_cfdm_lwork = nint(  dble( my_cfdm_work(1) )  )
-!        my_cfdm_lrwork = nint( my_cfdm_rwork(1) )
+        selectcase(eigensolver)
+            case("qr")        !! QR algorithm (slow, minimal memory)
+!                !! work space query (alternative manual definition)
+!                call PZHEEV('V', 'U', size3n, my_relay, 1, 1, desc3n3n, eigs, &
+!                            my_evecs, 1, 1, desc3n3n, my_cfdm_work, -1, &
+!                            my_cfdm_rwork, -1, ierr)
+!                
+!                my_cfdm_lwork = nint(  dble( my_cfdm_work(1) )  )
+!                my_cfdm_lrwork = nint( my_cfdm_rwork(1) )
+                
+                !! manually define size of work space arrays
+                my_cfdm_lwork = fb3n*(nrows_max+ncols_max+fb3n) + 3*size3n + &
+                                size3n*size3n
+                my_cfdm_lrwork = 4*size3n - 2
+                if ( allocated(my_cfdm_work) ) deallocate(my_cfdm_work, stat=ierr)
+                allocate(my_cfdm_work(my_cfdm_lwork), stat=ierr)
+                if ( allocated(my_cfdm_rwork) ) deallocate(my_cfdm_rwork, stat=ierr)
+                allocate(my_cfdm_rwork(my_cfdm_lrwork), stat=ierr)
+                !! solve eigenvalue (+eigenvector) problem
+                call PZHEEV('V', 'U', size3n, my_relay, 1, 1, desc3n3n, eigs, &
+                       my_evecs, 1, 1, desc3n3n, my_cfdm_work, my_cfdm_lwork, &
+                       my_cfdm_rwork, my_cfdm_lrwork, ierr)
+            
+            case("dandc")     !! Divide & Conquer (fast, large memory)
+                if ( allocated(my_cfdm_iwork) ) deallocate(my_cfdm_iwork)
+                allocate( my_cfdm_iwork(1), stat=ierr )
+                call PZHEEVD('V', 'U', size3n, my_relay, 1, 1, desc3n3n, &
+                             eigs, my_evecs, 1, 1, desc3n3n, my_cfdm_work, &
+                             -1, my_cfdm_rwork, -1, my_cfdm_iwork, -1, ierr)
+                my_cfdm_lwork = nint( dble(my_cfdm_work(1)) )
+                my_cfdm_lrwork = nint( my_cfdm_rwork(1) )
+                my_cfdm_liwork = my_cfdm_iwork(1)
+                
+                if ( allocated(my_cfdm_work) ) deallocate(my_cfdm_work)
+                allocate( my_cfdm_work(my_cfdm_lwork), stat=ierr )
+                if ( allocated(my_cfdm_rwork) ) deallocate(my_cfdm_rwork, stat=ierr)
+                allocate(my_cfdm_rwork(my_cfdm_lrwork), stat=ierr)
+                if ( allocated(my_cfdm_iwork) ) deallocate(my_cfdm_iwork)
+                allocate( my_cfdm_iwork(my_cfdm_liwork), stat=ierr )
+                call PZHEEVD('V', 'U', size3n, my_relay, 1, 1, desc3n3n, &
+                             eigs, my_evecs, 1, 1, desc3n3n, my_cfdm_work, &
+                             my_cfdm_lwork, my_cfdm_rwork, my_cfdm_lrwork, &
+                             my_cfdm_iwork, my_cfdm_liwork, ierr)
+                if ( allocated(my_cfdm_iwork) ) deallocate(my_cfdm_iwork)
+            
+            case("mrrr")      !! MRRR algorithm (fast, medium memory)
+                if ( allocated(my_cfdm_iwork) ) deallocate(my_cfdm_iwork)
+                allocate( my_cfdm_iwork(1), stat=ierr )
+                call PZHEEVR('V', 'A', 'U', size3n, my_relay, 1, 1, &
+                             desc3n3n, vl, vu, il, iu, nvals, nvecs, eigs, &
+                             my_evecs, 1, 1, desc3n3n, my_cfdm_work, -1, &
+                             my_cfdm_rwork, -1, my_cfdm_iwork, -1, ierr)
+                my_cfdm_lwork = nint( dble(my_cfdm_work(1)) )
+                my_cfdm_lrwork = nint( my_cfdm_rwork(1) )
+                my_cfdm_liwork = my_cfdm_iwork(1)
+                if ( allocated(my_cfdm_work) ) deallocate(my_cfdm_work)
+                allocate( my_cfdm_work(my_cfdm_lwork), stat=ierr )
+                if ( allocated(my_cfdm_rwork) ) deallocate(my_cfdm_rwork, stat=ierr)
+                allocate(my_cfdm_rwork(my_cfdm_lrwork), stat=ierr)
+                if ( allocated(my_cfdm_iwork) ) deallocate(my_cfdm_iwork)
+                allocate( my_cfdm_iwork(my_cfdm_liwork), stat=ierr )
+                call PZHEEVR('V', 'A', 'U', size3n, my_relay, 1, 1, &
+                             desc3n3n, vl, vu, il, iu, nvals, nvecs, eigs, &
+                             my_evecs, 1, 1, desc3n3n, my_cfdm_work, &
+                             my_cfdm_lwork, my_cfdm_rwork, my_cfdm_lrwork, &
+                             my_cfdm_iwork, my_cfdm_liwork, ierr)
+                if ( allocated(my_cfdm_iwork) ) deallocate(my_cfdm_iwork)
+        endselect
         
-        !! manually define size of work space arrays
-        my_cfdm_lwork = fb3n*(nrows_max+ncols_max+fb3n) + 3*size3n + &
-                        size3n*size3n
-        my_cfdm_lrwork = 4*size3n - 2
-        if ( allocated(my_cfdm_work) ) deallocate(my_cfdm_work, stat=ierr)
-        allocate(my_cfdm_work(my_cfdm_lwork), stat=ierr)
-        if ( allocated(my_cfdm_rwork) ) deallocate(my_cfdm_rwork, stat=ierr)
-        allocate(my_cfdm_rwork(my_cfdm_lrwork), stat=ierr)
-        !! solve eigenvalue (+eigenvector) problem
-        call PZHEEV('V', 'U', size3n, my_relay, 1, 1, desc3n3n, eigs, &
-               my_evecs, 1, 1, desc3n3n, my_cfdm_work, my_cfdm_lwork, &
-               my_cfdm_rwork, my_cfdm_lrwork, ierr)
-        
-        !! write eigenvectors to output file (see scalapack_io.f)
+        !! write eigenvectors to output file
         if (allocated(my_write_work)) deallocate(my_write_work)
         allocate(my_write_work(fb3n), stat=ierr)
         call PZWRITEEIGVEC("mbd_eigenmodes_kpt"//trim(tostr(kptID))//".out", &
@@ -3637,26 +3973,73 @@ function get_single_reciprocal_mbd_ene_s(mode, version, xyz, alpha_0, &
         if ( allocated(my_evecs) ) deallocate(my_evecs)
         allocate( my_evecs(1,1), stat=ierr)
         
-!        !! work space query
-!        call PZHEEV('N', 'U', size3n, my_relay, 1, 1, desc3n3n, eigs, &
-!                    my_evecs, 1, 1, desc3n3n, my_cfdm_work, -1, &
-!                    my_cfdm_rwork, -1, ierr)
-!        
-!        my_cfdm_lwork = nint(  dble( my_cfdm_work(1) )  )
-!        my_cfdm_lrwork = nint(my_cfdm_rwork(1))
-        my_cfdm_lwork = fb3n*nrows_max + fb3n + 3*size3n
-        my_cfdm_lrwork = 2*size3n
-        if ( allocated(my_cfdm_work) ) deallocate(my_cfdm_work)
-        allocate(my_cfdm_work(my_cfdm_lwork))
-        if ( allocated(my_cfdm_rwork) ) deallocate(my_cfdm_rwork)
-        allocate(my_cfdm_rwork(my_cfdm_lrwork))
-        
-        !! solve eigenvalue problem
-        call PZHEEV('N', 'U', size3n, my_relay, 1, 1, desc3n3n, eigs, &
-               my_evecs, 1, 1, desc3n3n, my_cfdm_work, my_cfdm_lwork, &
-               my_cfdm_rwork, my_cfdm_lrwork, ierr)
-        
+        selectcase(eigensolver)
+            case ("qr")        !! QR algorithm (slow, minimal memory)
+!                !! work space query (alternative manual definition)
+!                call PZHEEV('N', 'U', size3n, my_relay, 1, 1, desc3n3n, eigs, &
+!                            my_evecs, 1, 1, desc3n3n, my_cfdm_work, -1, &
+!                            my_cfdm_rwork, -1, ierr)
+!                
+!                my_cfdm_lwork = nint(  dble( my_cfdm_work(1) )  )
+!                my_cfdm_lrwork = nint( my_cfdm_rwork(1) )
+                !! manually define size of work space arrays
+                my_cfdm_lwork = fb3n*nrows_max + fb3n + 3*size3n
+                my_cfdm_lrwork = 2*size3n
+                if ( allocated(my_cfdm_work) ) deallocate(my_cfdm_work, stat=ierr)
+                allocate(my_cfdm_work(my_cfdm_lwork), stat=ierr)
+                if ( allocated(my_cfdm_rwork) ) deallocate(my_cfdm_rwork, stat=ierr)
+                allocate(my_cfdm_rwork(my_cfdm_lrwork), stat=ierr)
+                !! solve eigenvalue (+eigenvector) problem
+                call PZHEEV('N', 'U', size3n, my_relay, 1, 1, desc3n3n, eigs, &
+                       my_evecs, 1, 1, desc3n3n, my_cfdm_work, my_cfdm_lwork, &
+                       my_cfdm_rwork, my_cfdm_lrwork, ierr)
+            
+            case("dandc")     !! Divide & Conquer (fast, large memory)
+                if ( allocated(my_cfdm_iwork) ) deallocate(my_cfdm_iwork)
+                allocate( my_cfdm_iwork(1), stat=ierr )
+                call PZHEEVD('N', 'U', size3n, my_relay, 1, 1, desc3n3n, &
+                             eigs, my_evecs, 1, 1, desc3n3n, my_cfdm_work, &
+                             -1, my_cfdm_rwork, -1, my_cfdm_iwork, -1, ierr)
+                my_cfdm_lwork = nint( dble(my_cfdm_work(1)) )
+                my_cfdm_lrwork = nint( my_cfdm_rwork(1) )
+                my_cfdm_liwork = my_cfdm_iwork(1)
+                if ( allocated(my_cfdm_work) ) deallocate(my_cfdm_work, stat=ierr)
+                allocate( my_cfdm_work(my_cfdm_lwork), stat=ierr )
+                if ( allocated(my_cfdm_rwork) ) deallocate(my_cfdm_rwork, stat=ierr)
+                allocate(my_cfdm_rwork(my_cfdm_lrwork), stat=ierr)
+                if ( allocated(my_cfdm_iwork) ) deallocate(my_cfdm_iwork)
+                allocate( my_cfdm_iwork(my_cfdm_liwork), stat=ierr )
+                call PZHEEVD('N', 'U', size3n, my_relay, 1, 1, desc3n3n, &
+                             eigs, my_evecs, 1, 1, desc3n3n, my_cfdm_work, &
+                             my_cfdm_lwork, my_cfdm_rwork, my_cfdm_lrwork, &
+                             my_cfdm_iwork, my_cfdm_liwork, ierr)
+                if ( allocated(my_cfdm_iwork) ) deallocate(my_cfdm_iwork)
+            
+            case("mrrr")      !! MRRR algorithm (fast, medium memory)
+                if ( allocated(my_cfdm_iwork) ) deallocate(my_cfdm_iwork)
+                allocate( my_cfdm_iwork(1), stat=ierr )
+                call PZHEEVR('N', 'A', 'U', size3n, my_relay, 1, 1, &
+                             desc3n3n, vl, vu, il, iu, nvals, nvecs, eigs, &
+                             my_evecs, 1, 1, desc3n3n, my_cfdm_work, -1, &
+                             my_cfdm_rwork, -1, my_cfdm_iwork, -1, ierr)
+                my_cfdm_lwork = nint( dble(my_cfdm_work(1)) )
+                my_cfdm_lrwork = nint( my_cfdm_rwork(1) )
+                my_cfdm_liwork = my_cfdm_iwork(1)
+                if ( allocated(my_cfdm_work) ) deallocate(my_cfdm_work, stat=ierr)
+                allocate( my_cfdm_work(my_cfdm_lwork), stat=ierr )
+                if ( allocated(my_cfdm_rwork) ) deallocate(my_cfdm_rwork, stat=ierr)
+                allocate(my_cfdm_rwork(my_cfdm_lrwork), stat=ierr)
+                if ( allocated(my_cfdm_iwork) ) deallocate(my_cfdm_iwork)
+                allocate( my_cfdm_iwork(my_cfdm_liwork), stat=ierr )
+                call PZHEEVR('N', 'A', 'U', size3n, my_relay, 1, 1, &
+                             desc3n3n, vl, vu, il, iu, nvals, nvecs, eigs, &
+                             my_evecs, 1, 1, desc3n3n, my_cfdm_work, &
+                             my_cfdm_lwork, my_cfdm_rwork, my_cfdm_lrwork, &
+                             my_cfdm_iwork, my_cfdm_liwork, ierr)
+                if ( allocated(my_cfdm_iwork) ) deallocate(my_cfdm_iwork)
+        endselect
     endif
+    
     !! deallocations
     if ( allocated(my_evecs) ) deallocate(my_evecs)
     if ( allocated(my_cfdm_work) ) deallocate(my_cfdm_work, stat=ierr)
@@ -3804,18 +4187,20 @@ subroutine PZWRITEEIGVEC( FILNAM, M, N, A, IA, JA, DESCA, IRWRIT, &
     complex(8), intent(in)         :: A(*), WORK(:)
     real(8), intent(in), optional  :: KPOINT(3)
     
-    integer, parameter  :: NOUT=13, BLOCK_CYCLIC_2D=1, CSRC_=8, &
-                           CTXT_=2, DLEN_=9, DT_=1, LLD_=9, MB_=5, &
-                           M_=3, NB_=6, N_=4, RSRC_=7
+    integer, parameter  :: BLOCK_CYCLIC_2D=1, CSRC_=8, CTXT_=2, &
+                           DLEN_=9, DT_=1, LLD_=9, MB_=5, M_=3, &
+                           NB_=6, N_=4, RSRC_=7
     integer             :: H, I, IACOL, IAROW, IB, ICTXT, ICURCOL, &
                            ICURROW, II, IIA, I_N, J, JB, JJ, JJA, JN,&
-                           K, LDA, MYCOL, MYROW, NPCOL, NPROW, ICEIL
+                           K, LDA, MYCOL, MYROW, NPCOL, NPROW, ICEIL,&
+                           NOUT
     
     
     !! Get grid parameters
     ICTXT = DESCA( CTXT_ )
     call BLACS_GRIDINFO( ICTXT, NPROW, NPCOL, MYROW, MYCOL )
     
+    NOUT = get_FileId()
     if( MYROW .eq. IRWRIT .and. MYCOL .eq. ICWRIT ) then
         open( NOUT, file=FILNAM, status='unknown', form='unformatted' )
         write( NOUT ) M, N
@@ -3991,18 +4376,19 @@ subroutine PDWRITEEIGVEC( FILNAM, M, N, A, IA, JA, DESCA, IRWRIT, &
     integer, intent(in)           :: DESCA(:)
     real(8), intent(in)           :: A(*), WORK(:)
     
-    integer, parameter  :: NOUT=13, BLOCK_CYCLIC_2D=1, CSRC_=8, &
-                           CTXT_=2, DLEN_=9, DT_=1, LLD_=9, MB_=5, &
-                           M_=3, NB_=6, N_=4, RSRC_=7
+    integer, parameter  :: BLOCK_CYCLIC_2D=1, CSRC_=8, CTXT_=2, &
+                           DLEN_=9, DT_=1, LLD_=9, MB_=5, M_=3, &
+                           NB_=6, N_=4, RSRC_=7
     integer  :: H, I, IACOL, IAROW, IB, ICTXT, ICURCOL, ICURROW, II, &
                 IIA, I_N, J, JB, JJ, JJA, JN, K, LDA, MYCOL, MYROW, &
-                NPCOL, NPROW, ICEIL
+                NPCOL, NPROW, ICEIL, NOUT
     
     
     !! Get grid parameters
     ICTXT = DESCA( CTXT_ )
     call BLACS_GRIDINFO( ICTXT, NPROW, NPCOL, MYROW, MYCOL )
-        
+    
+    NOUT = get_FileId()
     if( MYROW.eq.IRWRIT .and. MYCOL.eq.ICWRIT ) then
         open( NOUT, file=FILNAM, status='unknown', form='unformatted' )
         write( NOUT ) M, N
@@ -4146,6 +4532,50 @@ subroutine PDWRITEEIGVEC( FILNAM, M, N, A, IA, JA, DESCA, IRWRIT, &
     endif
 
 end subroutine PDWRITEEIGVEC
+
+
+subroutine ZWRITEEIGVEC(eigenvectors, filenam, kpoint)
+    complex(8), intent(in)         :: eigenvectors(:,:)
+    character(len=*),intent(in)    :: filenam
+    real(8), intent(in), optional  :: kpoint(3)
+    
+    integer  :: fID, n, i, j
+    
+    
+    fID = get_FileId()
+    n = size(eigenvectors,1)
+    open( fID, file=filenam, status='unknown', form='unformatted' )
+    write( fID ) n, n
+    if ( present(kpoint) ) write( fID ) kpoint
+    do i=1, n
+        do j=1, n
+            write( fID ) eigenvectors(i, j)
+        enddo
+    enddo
+    close( fID )
+    
+end subroutine ZWRITEEIGVEC
+
+
+subroutine DWRITEEIGVEC(eigenvectors, filenam)
+    real(8), intent(in)           :: eigenvectors(:,:)
+    character(len=*), intent(in)  :: filenam
+    
+    integer  :: fID, n, i, j
+    
+    
+    fID = get_FileId()
+    n = size(eigenvectors,1)
+    open( fID, file=filenam, status='unknown', form='unformatted' )
+    write( fID ) n, n
+    do i=1, n
+        do j=1,n
+            write( fID ) eigenvectors(i, j)
+        enddo
+    enddo
+    close( fID )
+
+end subroutine DWRITEEIGVEC
 
 
 subroutine exit_blacs_and_finalize(continuation)
@@ -4517,7 +4947,7 @@ function make_g_grid(n1, n2, n3) result(g_grid)
     g_kpt = (/ 0, 0, -1 /)
     kpt_range = (/ n1, n2, n3 /)
     do i_kpt = 1, n1*n2*n3
-        call shift_cell (g_kpt, (/ 0, 0, 0 /), kpt_range-1)
+        call shift_cell(g_kpt, (/ 0, 0, 0 /), kpt_range-1)
         g_kpt_shifted = dble(g_kpt)+param_k_grid_shift
         where (2*g_kpt_shifted > kpt_range)
             g_kpt_shifted = g_kpt_shifted-dble(kpt_range)
