@@ -3469,7 +3469,7 @@ function get_single_mbd_energy_s(mode, version, xyz, alpha_0, omega, &
                             eigs, my_evecs, 1, 1, desc3n3n, my_cfdm_work, &
                             -1, ierr)
                 my_cfdm_lwork = nint( my_cfdm_work(1) )
-                if ( allocated(my_cfdm_work) ) deallocate(my_cfdm_work)
+                deallocate(my_cfdm_work)
                 allocate( my_cfdm_work(my_cfdm_lwork), stat=ierr )
                 call PDSYEV('V', 'U', size3n, my_relay, 1, 1, desc3n3n, &
                             eigs, my_evecs, 1, 1, desc3n3n, my_cfdm_work, &
@@ -3483,9 +3483,9 @@ function get_single_mbd_energy_s(mode, version, xyz, alpha_0, omega, &
                              -1, my_cfdm_iwork, -1, ierr)
                 my_cfdm_lwork = nint( my_cfdm_work(1) )
                 my_cfdm_liwork = my_cfdm_iwork(1)
-                if ( allocated(my_cfdm_work) ) deallocate(my_cfdm_work)
+                deallocate(my_cfdm_work)
                 allocate( my_cfdm_work(my_cfdm_lwork), stat=ierr )
-                if ( allocated(my_cfdm_iwork) ) deallocate(my_cfdm_iwork)
+                deallocate(my_cfdm_iwork)
                 allocate( my_cfdm_iwork(my_cfdm_liwork), stat=ierr )
                 call PDSYEVD('V', 'U', size3n, my_relay, 1, 1, desc3n3n, &
                              eigs, my_evecs, 1, 1, desc3n3n, my_cfdm_work, &
@@ -3502,9 +3502,9 @@ function get_single_mbd_energy_s(mode, version, xyz, alpha_0, omega, &
                              my_cfdm_iwork, -1, ierr)
                 my_cfdm_lwork = nint( my_cfdm_work(1) )
                 my_cfdm_liwork = my_cfdm_iwork(1)
-                if ( allocated(my_cfdm_work) ) deallocate(my_cfdm_work)
+                deallocate(my_cfdm_work)
                 allocate( my_cfdm_work(my_cfdm_lwork), stat=ierr )
-                if ( allocated(my_cfdm_iwork) ) deallocate(my_cfdm_iwork)
+                deallocate(my_cfdm_iwork)
                 allocate( my_cfdm_iwork(my_cfdm_liwork), stat=ierr )
                 call PDSYEVR('V', 'A', 'U', size3n, my_relay, 1, 1, &
                              desc3n3n, vl, vu, il, iu, nvals, nvecs, eigs, &
@@ -3519,46 +3519,52 @@ function get_single_mbd_energy_s(mode, version, xyz, alpha_0, omega, &
         allocate(my_write_work(fb3n), stat=ierr)
         call PDWRITEEIGVEC('mbd_eigenmodes.out', size3n, size3n, my_evecs, &
                           1, 1, desc3n3n, 0, 0, my_write_work)
-        if (allocated(my_write_work)) deallocate(my_write_work)
+        deallocate(my_write_work)
     
     else
-        !! allocate dummy for eigenvectors
-        if ( allocated(my_evecs) ) deallocate(my_evecs)
-        allocate( my_evecs(1,1), stat=ierr )
-        
         selectcase(eigensolver)
             case("qr")
+                !! allocate dummy for eigenvectors
+                if ( allocated(my_evecs) ) deallocate(my_evecs)
+                allocate( my_evecs(1,1), stat=ierr )
                 !! work space query (for QR algorithm)
                 call PDSYEV('N', 'U', size3n, my_relay, 1, 1, desc3n3n, &
                             eigs, my_evecs, 1, 1, desc3n3n, my_cfdm_work, &
                             -1, ierr)
                 my_cfdm_lwork = nint( my_cfdm_work(1) )
-                if ( allocated(my_cfdm_work) ) deallocate(my_cfdm_work)
+                deallocate(my_cfdm_work)
                 allocate( my_cfdm_work(my_cfdm_lwork), stat=ierr )
                 call PDSYEV('N', 'U', size3n, my_relay, 1, 1, desc3n3n, &
                             eigs, my_evecs, 1, 1, desc3n3n, my_cfdm_work, &
                             my_cfdm_lwork, ierr)
                 
             case("dandc")
+                !! only eigenvalues not implemented in PDSYEVD yet
+                if ( allocated(my_evecs) ) deallocate(my_evecs)
+                allocate( my_evecs(my_nrows3n, my_ncols3n), stat=ierr )
+                
                 !! work space query (for Divide & Conquer algorithm)
                 if ( allocated(my_cfdm_iwork) ) deallocate(my_cfdm_iwork)
                 allocate( my_cfdm_iwork(1), stat=ierr )
-                call PDSYEVD('N', 'U', size3n, my_relay, 1, 1, desc3n3n, &
+                call PDSYEVD('V', 'U', size3n, my_relay, 1, 1, desc3n3n, &
                              eigs, my_evecs, 1, 1, desc3n3n, my_cfdm_work, &
                              -1, my_cfdm_iwork, -1, ierr)
                 my_cfdm_lwork = nint( my_cfdm_work(1) )
                 my_cfdm_liwork = my_cfdm_iwork(1)
-                if ( allocated(my_cfdm_work) ) deallocate(my_cfdm_work)
+                deallocate(my_cfdm_work)
                 allocate( my_cfdm_work(my_cfdm_lwork), stat=ierr )
-                if ( allocated(my_cfdm_iwork) ) deallocate(my_cfdm_iwork)
+                deallocate(my_cfdm_iwork)
                 allocate( my_cfdm_iwork(my_cfdm_liwork), stat=ierr )
-                call PDSYEVD('N', 'U', size3n, my_relay, 1, 1, desc3n3n, &
+                call PDSYEVD('V', 'U', size3n, my_relay, 1, 1, desc3n3n, &
                              eigs, my_evecs, 1, 1, desc3n3n, my_cfdm_work, &
                              my_cfdm_lwork, my_cfdm_iwork, my_cfdm_liwork, &
                              ierr)
-                if ( allocated(my_cfdm_iwork) ) deallocate(my_cfdm_iwork)
-                
+                deallocate(my_cfdm_iwork)
+            
             case("mrrr")
+                !! allocate dummy for eigenvectors
+                if ( allocated(my_evecs) ) deallocate(my_evecs)
+                allocate( my_evecs(1,1), stat=ierr )
                 !! work space query (for MRRR algorithm)
                 if ( allocated(my_cfdm_iwork) ) deallocate(my_cfdm_iwork)
                 allocate( my_cfdm_iwork(1), stat=ierr )
@@ -3568,24 +3574,24 @@ function get_single_mbd_energy_s(mode, version, xyz, alpha_0, omega, &
                              my_cfdm_iwork, -1, ierr)
                 my_cfdm_lwork = nint( my_cfdm_work(1) )
                 my_cfdm_liwork = my_cfdm_iwork(1)
-                if ( allocated(my_cfdm_work) ) deallocate(my_cfdm_work)
+                deallocate(my_cfdm_work)
                 allocate( my_cfdm_work(my_cfdm_lwork), stat=ierr )
-                if ( allocated(my_cfdm_iwork) ) deallocate(my_cfdm_iwork)
+                deallocate(my_cfdm_iwork)
                 allocate( my_cfdm_iwork(my_cfdm_liwork), stat=ierr )
                 call PDSYEVR('N', 'A', 'U', size3n, my_relay, 1, 1, &
                              desc3n3n, vl, vu, il, iu, nvals, nvecs, eigs, &
                              my_evecs, 1, 1, desc3n3n, my_cfdm_work, &
                              my_cfdm_lwork, my_cfdm_iwork, my_cfdm_liwork, &
                              ierr)
-                if ( allocated(my_cfdm_iwork) ) deallocate(my_cfdm_iwork)
+                deallocate(my_cfdm_iwork)
         endselect
     endif
     !! deallocations
-    if ( allocated(my_evecs) ) deallocate(my_evecs)
-    if ( allocated(my_cfdm_work) ) deallocate(my_cfdm_work, stat=ierr)
-    if ( allocated(my_row2glob) ) deallocate(my_row2glob)
-    if ( allocated(my_col2glob) ) deallocate(my_col2glob)
-    if ( allocated(my_relay) ) deallocate(my_relay, stat=ierr)
+    deallocate(my_evecs)
+    deallocate(my_cfdm_work, stat=ierr)
+    deallocate(my_row2glob)
+    deallocate(my_col2glob)
+    deallocate(my_relay, stat=ierr)
     call ts(-21)
     
     if ( (get_eigenvalues) .and. (io_proc) ) then
@@ -3895,21 +3901,13 @@ function get_single_reciprocal_mbd_ene_s(mode, version, xyz, alpha_0, &
         
         selectcase(eigensolver)
             case("qr")        !! QR algorithm (slow, minimal memory)
-!                !! work space query (alternative manual definition)
-!                call PZHEEV('V', 'U', size3n, my_relay, 1, 1, desc3n3n, eigs, &
-!                            my_evecs, 1, 1, desc3n3n, my_cfdm_work, -1, &
-!                            my_cfdm_rwork, -1, ierr)
-!                
-!                my_cfdm_lwork = nint(  dble( my_cfdm_work(1) )  )
-!                my_cfdm_lrwork = nint( my_cfdm_rwork(1) )
-                
                 !! manually define size of work space arrays
                 my_cfdm_lwork = fb3n*(nrows_max+ncols_max+fb3n) + 3*size3n + &
                                 size3n*size3n
                 my_cfdm_lrwork = 4*size3n - 2
-                if ( allocated(my_cfdm_work) ) deallocate(my_cfdm_work, stat=ierr)
+                deallocate(my_cfdm_work, stat=ierr)
                 allocate(my_cfdm_work(my_cfdm_lwork), stat=ierr)
-                if ( allocated(my_cfdm_rwork) ) deallocate(my_cfdm_rwork, stat=ierr)
+                deallocate(my_cfdm_rwork, stat=ierr)
                 allocate(my_cfdm_rwork(my_cfdm_lrwork), stat=ierr)
                 !! solve eigenvalue (+eigenvector) problem
                 call PZHEEV('V', 'U', size3n, my_relay, 1, 1, desc3n3n, eigs, &
@@ -3926,11 +3924,11 @@ function get_single_reciprocal_mbd_ene_s(mode, version, xyz, alpha_0, &
                 my_cfdm_lrwork = nint( my_cfdm_rwork(1) )
                 my_cfdm_liwork = my_cfdm_iwork(1)
                 
-                if ( allocated(my_cfdm_work) ) deallocate(my_cfdm_work)
+                deallocate(my_cfdm_work)
                 allocate( my_cfdm_work(my_cfdm_lwork), stat=ierr )
-                if ( allocated(my_cfdm_rwork) ) deallocate(my_cfdm_rwork, stat=ierr)
+                deallocate(my_cfdm_rwork, stat=ierr)
                 allocate(my_cfdm_rwork(my_cfdm_lrwork), stat=ierr)
-                if ( allocated(my_cfdm_iwork) ) deallocate(my_cfdm_iwork)
+                deallocate(my_cfdm_iwork)
                 allocate( my_cfdm_iwork(my_cfdm_liwork), stat=ierr )
                 call PZHEEVD('V', 'U', size3n, my_relay, 1, 1, desc3n3n, &
                              eigs, my_evecs, 1, 1, desc3n3n, my_cfdm_work, &
@@ -3948,18 +3946,18 @@ function get_single_reciprocal_mbd_ene_s(mode, version, xyz, alpha_0, &
                 my_cfdm_lwork = nint( dble(my_cfdm_work(1)) )
                 my_cfdm_lrwork = nint( my_cfdm_rwork(1) )
                 my_cfdm_liwork = my_cfdm_iwork(1)
-                if ( allocated(my_cfdm_work) ) deallocate(my_cfdm_work)
+                deallocate(my_cfdm_work)
                 allocate( my_cfdm_work(my_cfdm_lwork), stat=ierr )
-                if ( allocated(my_cfdm_rwork) ) deallocate(my_cfdm_rwork, stat=ierr)
+                deallocate(my_cfdm_rwork, stat=ierr)
                 allocate(my_cfdm_rwork(my_cfdm_lrwork), stat=ierr)
-                if ( allocated(my_cfdm_iwork) ) deallocate(my_cfdm_iwork)
+                deallocate(my_cfdm_iwork)
                 allocate( my_cfdm_iwork(my_cfdm_liwork), stat=ierr )
                 call PZHEEVR('V', 'A', 'U', size3n, my_relay, 1, 1, &
                              desc3n3n, vl, vu, il, iu, nvals, nvecs, eigs, &
                              my_evecs, 1, 1, desc3n3n, my_cfdm_work, &
                              my_cfdm_lwork, my_cfdm_rwork, my_cfdm_lrwork, &
                              my_cfdm_iwork, my_cfdm_liwork, ierr)
-                if ( allocated(my_cfdm_iwork) ) deallocate(my_cfdm_iwork)
+                deallocate(my_cfdm_iwork)
         endselect
         
         !! write eigenvectors to output file
@@ -3968,20 +3966,13 @@ function get_single_reciprocal_mbd_ene_s(mode, version, xyz, alpha_0, &
         call PZWRITEEIGVEC("mbd_eigenmodes_kpt"//trim(tostr(kptID))//".out", &
                           size3n, size3n, my_evecs, 1, 1, desc3n3n, &
                           0, 0, my_write_work, k_point)
-        if (allocated(my_write_work)) deallocate(my_write_work)
+        deallocate(my_write_work)
     else
-        if ( allocated(my_evecs) ) deallocate(my_evecs)
-        allocate( my_evecs(1,1), stat=ierr)
-        
         selectcase(eigensolver)
             case ("qr")        !! QR algorithm (slow, minimal memory)
-!                !! work space query (alternative manual definition)
-!                call PZHEEV('N', 'U', size3n, my_relay, 1, 1, desc3n3n, eigs, &
-!                            my_evecs, 1, 1, desc3n3n, my_cfdm_work, -1, &
-!                            my_cfdm_rwork, -1, ierr)
-!                
-!                my_cfdm_lwork = nint(  dble( my_cfdm_work(1) )  )
-!                my_cfdm_lrwork = nint( my_cfdm_rwork(1) )
+                !! dummy for eigenvectors
+                if ( allocated(my_evecs) ) deallocate(my_evecs)
+                allocate( my_evecs(1,1), stat=ierr)
                 !! manually define size of work space arrays
                 my_cfdm_lwork = fb3n*nrows_max + fb3n + 3*size3n
                 my_cfdm_lrwork = 2*size3n
@@ -3989,33 +3980,39 @@ function get_single_reciprocal_mbd_ene_s(mode, version, xyz, alpha_0, &
                 allocate(my_cfdm_work(my_cfdm_lwork), stat=ierr)
                 if ( allocated(my_cfdm_rwork) ) deallocate(my_cfdm_rwork, stat=ierr)
                 allocate(my_cfdm_rwork(my_cfdm_lrwork), stat=ierr)
-                !! solve eigenvalue (+eigenvector) problem
+                !! solve eigenvalue problem
                 call PZHEEV('N', 'U', size3n, my_relay, 1, 1, desc3n3n, eigs, &
                        my_evecs, 1, 1, desc3n3n, my_cfdm_work, my_cfdm_lwork, &
                        my_cfdm_rwork, my_cfdm_lrwork, ierr)
             
             case("dandc")     !! Divide & Conquer (fast, large memory)
+                !! only eigenvectors not implemented in PZHEEVD yet
+                if ( allocated(my_evecs) ) deallocate(my_evecs)
+                allocate( my_evecs(my_nrows3n, my_ncols3n), stat=ierr)
                 if ( allocated(my_cfdm_iwork) ) deallocate(my_cfdm_iwork)
                 allocate( my_cfdm_iwork(1), stat=ierr )
-                call PZHEEVD('N', 'U', size3n, my_relay, 1, 1, desc3n3n, &
+                call PZHEEVD('V', 'U', size3n, my_relay, 1, 1, desc3n3n, &
                              eigs, my_evecs, 1, 1, desc3n3n, my_cfdm_work, &
                              -1, my_cfdm_rwork, -1, my_cfdm_iwork, -1, ierr)
                 my_cfdm_lwork = nint( dble(my_cfdm_work(1)) )
                 my_cfdm_lrwork = nint( my_cfdm_rwork(1) )
                 my_cfdm_liwork = my_cfdm_iwork(1)
-                if ( allocated(my_cfdm_work) ) deallocate(my_cfdm_work, stat=ierr)
+                deallocate(my_cfdm_work, stat=ierr)
                 allocate( my_cfdm_work(my_cfdm_lwork), stat=ierr )
-                if ( allocated(my_cfdm_rwork) ) deallocate(my_cfdm_rwork, stat=ierr)
+                deallocate(my_cfdm_rwork, stat=ierr)
                 allocate(my_cfdm_rwork(my_cfdm_lrwork), stat=ierr)
-                if ( allocated(my_cfdm_iwork) ) deallocate(my_cfdm_iwork)
+                deallocate(my_cfdm_iwork)
                 allocate( my_cfdm_iwork(my_cfdm_liwork), stat=ierr )
-                call PZHEEVD('N', 'U', size3n, my_relay, 1, 1, desc3n3n, &
+                call PZHEEVD('V', 'U', size3n, my_relay, 1, 1, desc3n3n, &
                              eigs, my_evecs, 1, 1, desc3n3n, my_cfdm_work, &
                              my_cfdm_lwork, my_cfdm_rwork, my_cfdm_lrwork, &
                              my_cfdm_iwork, my_cfdm_liwork, ierr)
-                if ( allocated(my_cfdm_iwork) ) deallocate(my_cfdm_iwork)
+                deallocate(my_cfdm_iwork)
             
             case("mrrr")      !! MRRR algorithm (fast, medium memory)
+                !! dummy for eigenvectors
+                if ( allocated(my_evecs) ) deallocate(my_evecs)
+                allocate( my_evecs(1,1), stat=ierr)
                 if ( allocated(my_cfdm_iwork) ) deallocate(my_cfdm_iwork)
                 allocate( my_cfdm_iwork(1), stat=ierr )
                 call PZHEEVR('N', 'A', 'U', size3n, my_relay, 1, 1, &
@@ -4025,28 +4022,28 @@ function get_single_reciprocal_mbd_ene_s(mode, version, xyz, alpha_0, &
                 my_cfdm_lwork = nint( dble(my_cfdm_work(1)) )
                 my_cfdm_lrwork = nint( my_cfdm_rwork(1) )
                 my_cfdm_liwork = my_cfdm_iwork(1)
-                if ( allocated(my_cfdm_work) ) deallocate(my_cfdm_work, stat=ierr)
+                deallocate(my_cfdm_work, stat=ierr)
                 allocate( my_cfdm_work(my_cfdm_lwork), stat=ierr )
-                if ( allocated(my_cfdm_rwork) ) deallocate(my_cfdm_rwork, stat=ierr)
+                deallocate(my_cfdm_rwork, stat=ierr)
                 allocate(my_cfdm_rwork(my_cfdm_lrwork), stat=ierr)
-                if ( allocated(my_cfdm_iwork) ) deallocate(my_cfdm_iwork)
+                deallocate(my_cfdm_iwork)
                 allocate( my_cfdm_iwork(my_cfdm_liwork), stat=ierr )
                 call PZHEEVR('N', 'A', 'U', size3n, my_relay, 1, 1, &
                              desc3n3n, vl, vu, il, iu, nvals, nvecs, eigs, &
                              my_evecs, 1, 1, desc3n3n, my_cfdm_work, &
                              my_cfdm_lwork, my_cfdm_rwork, my_cfdm_lrwork, &
                              my_cfdm_iwork, my_cfdm_liwork, ierr)
-                if ( allocated(my_cfdm_iwork) ) deallocate(my_cfdm_iwork)
+                deallocate(my_cfdm_iwork)
         endselect
     endif
     
     !! deallocations
-    if ( allocated(my_evecs) ) deallocate(my_evecs)
-    if ( allocated(my_cfdm_work) ) deallocate(my_cfdm_work, stat=ierr)
-    if ( allocated(my_cfdm_rwork) ) deallocate(my_cfdm_rwork, stat=ierr)
-    if ( allocated(my_row2glob) ) deallocate(my_row2glob)
-    if ( allocated(my_col2glob) ) deallocate(my_col2glob)
-    if ( allocated(my_relay) ) deallocate(my_relay, stat=ierr)
+    deallocate(my_evecs)
+    deallocate(my_cfdm_work, stat=ierr)
+    deallocate(my_cfdm_rwork, stat=ierr)
+    deallocate(my_row2glob)
+    deallocate(my_col2glob)
+    deallocate(my_relay, stat=ierr)
     call ts(-22)
     
     !! write eigenvalues to output file
