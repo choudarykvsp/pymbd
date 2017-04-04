@@ -168,7 +168,8 @@ function get_ts_energy( mode, version, xyz, C6, alpha_0, R_vdw, s_R, &
 
     real(8) :: C6_ij, r(3), r_norm, f_damp, R_vdw_ij, overlap_ij, &
         ene_shell, ene_pair, R_cell(3)
-    integer :: i_shell, i_cell, i_atom, j_atom, range_cell(3), idx_cell(3)
+    integer :: i_shell, i_cell, i_atom, j_atom, range_cell(3), &
+               minr_cell(3), idx_cell(3)
     real(8), parameter :: shell_thickness = 10.d0
     logical :: is_crystal, is_parallel
 
@@ -185,9 +186,10 @@ function get_ts_energy( mode, version, xyz, C6, alpha_0, R_vdw, s_R, &
         else
             range_cell = (/ 0, 0, 0 /)
         end if
+        minr_cell = -1*range_cell
         idx_cell = (/ 0, 0, -1 /)
         do i_cell = 1, product(1+2*range_cell)
-            call shift_cell(idx_cell, -range_cell, range_cell)
+            call shift_cell(idx_cell, minr_cell, range_cell)
             ! MPI code begin
             if (is_parallel .and. is_crystal) then
                 if (my_task /= modulo(i_cell, n_tasks)) cycle
@@ -339,7 +341,7 @@ subroutine add_dipole_matrix(mode, version, xyz, alpha, R_vdw, beta, a, &
         end if
         range_cell = supercell_circum(unit_cell, real_space_cutoff)
     else
-        range_cell(:) = 0
+        range_cell = (/ 0, 0, 0 /)
     end if
     if (is_crystal) then
         call print_log('Ewald: summing real part in cell vector range of '&
@@ -437,27 +439,27 @@ subroutine add_dipole_matrix(mode, version, xyz, alpha, R_vdw, beta, a, &
                         do_ewald = .false.
                 end select
                 if (do_ewald) then
-                    Tpp = Tpp+T_erfc(r, ewald_alpha)-T_bare(r)
+                    Tpp = Tpp + T_erfc(r, ewald_alpha) - T_bare(r)
                 end if
                 if (is_reciprocal) then
                     Tpp_c = Tpp*exp(-cmplx(0.d0, 1.d0, 8)*( &
-                        dot_product(k_point, r)))
+                                    dot_product(k_point, r)))
                 end if
-                i = 3*(i_atom-1)
-                j = 3*(j_atom-1)
+                i = 3*i_atom-2
+                j = 3*j_atom-2
                 if (is_reciprocal) then
-                    relay_c(i+1:i+3, j+1:j+3) = relay_c(i+1:i+3, j+1:j+3) &
-                        +Tpp_c
+                    relay_c(i:i+2, j:j+2) = relay_c(i:i+2, j:j+2) &
+                                            + Tpp_c
                     if (i_atom /= j_atom) then
-                        relay_c(j+1:j+3, i+1:i+3) = relay_c(j+1:j+3, i+1:i+3) &
-                            +transpose(Tpp_c)
+                        relay_c(j:j+2, i:i+2) = relay_c(j:j+2, i:i+2) &
+                                                + transpose(Tpp_c)
                     end if
                 else
-                    relay(i+1:i+3, j+1:j+3) = relay(i+1:i+3, j+1:j+3) &
-                        +Tpp
+                    relay(i:i+2, j:j+2) = relay(i:i+2, j:j+2) &
+                                          + Tpp
                     if (i_atom /= j_atom) then
-                        relay(j+1:j+3, i+1:i+3) = relay(j+1:j+3, i+1:i+3) &
-                            +transpose(Tpp)
+                        relay(j:j+2, i:i+2) = relay(j:j+2, i:i+2) &
+                                              + transpose(Tpp)
                     end if
                 end if
             end do ! j_atom
@@ -571,19 +573,19 @@ subroutine add_ewald_dipole_parts(mode, xyz, unit_cell, alpha, &
                 else
                     Tpp = k_prefactor*cos(dot_product(G_vector, r))
                 end if
-                i = 3*(i_atom-1)
-                j = 3*(j_atom-1)
+                i = 3*i_atom-2
+                j = 3*j_atom-2
                 if (is_reciprocal) then
-                    relay_c(i+1:i+3, j+1:j+3) = relay_c(i+1:i+3, j+1:j+3)+Tpp_c
+                    relay_c(i:i+2, j:j+2) = relay_c(i:i+2, j:j+2) + Tpp_c
                     if (i_atom /= j_atom) then
-                        relay_c(j+1:j+3, i+1:i+3) = relay_c(j+1:j+3, i+1:i+3) &
-                            +transpose(Tpp_c)
+                        relay_c(j:j+2, i:i+2) = relay_c(j:j+2, i:i+2) &
+                                                + transpose(Tpp_c)
                     end if
                 else
-                    relay(i+1:i+3, j+1:j+3) = relay(i+1:i+3, j+1:j+3)+Tpp
+                    relay(i:i+2, j:j+2) = relay(i:i+2, j:j+2) + Tpp
                     if (i_atom /= j_atom) then
-                        relay(j+1:j+3, i+1:i+3) = relay(j+1:j+3, i+1:i+3) &
-                            +transpose(Tpp)
+                        relay(j:j+2, i:i+2) = relay(j:j+2, i:i+2) &
+                                              + transpose(Tpp)
                     end if
                 end if
             end do ! j_atom
@@ -620,16 +622,16 @@ subroutine add_ewald_dipole_parts(mode, xyz, unit_cell, alpha, &
                     i = 3*(i_atom-1)+i_xyz
                     j = 3*(j_atom-1)+j_xyz
                     elem = 4*pi/volume*k_point(i_xyz)*k_point(j_xyz)/k_sq &
-                        *exp(-k_sq/(4*alpha**2))
+                        *exp(-k_sq/(4*alpha*alpha))
                     if (is_reciprocal) then
-                        relay_c(i, j) = relay_c(i, j)+elem
+                        relay_c(i, j) = relay_c(i, j) + elem
                         if (i_atom /= j_atom) then
-                            relay_c(j, i) = relay_c(j, i)+elem
+                            relay_c(j, i) = relay_c(j, i) + elem
                         end if
                     else
-                        relay(i, j) = relay(i, j)+elem
+                        relay(i, j) = relay(i, j) + elem
                         if (i_atom /= j_atom) then
-                            relay(j, i) = relay(j, i)+elem
+                            relay(j, i) = relay(j, i) + elem
                         end if
                     end if ! is_reciprocal
                 end do ! j_xyz
@@ -929,8 +931,7 @@ end function
 
 function get_mbd_energy(mode, version, xyz, alpha_0, omega, &
             supercell, k_grid, unit_cell, R_vdw, beta, a, overlap, C6, &
-            damping_custom, potential_custom) &
-            result(ene)
+            damping_custom, potential_custom) result(ene)
     character(len=*), intent(in)  :: mode, version
     real(8), intent(in)  :: &
         xyz(:, :), &
@@ -950,9 +951,9 @@ function get_mbd_energy(mode, version, xyz, alpha_0, omega, &
     real(8)  :: ene
     
     logical  :: is_parallel, do_rpa, is_reciprocal, is_crystal
-    real(8), allocatable     :: alpha(:, :), mode_enes(:,:)
-    real(8), allocatable     :: modes(:,:)
-    complex(8), allocatable  :: modes_k(:,:,:)
+    real(8), allocatable     :: alpha(:, :), mode_eigs(:,:)
+    real(8), allocatable     :: eigmodes(:,:)
+    complex(8), allocatable  :: eigmodes_k(:,:,:)
     integer                  :: i_kpt
     
     
@@ -976,33 +977,93 @@ function get_mbd_energy(mode, version, xyz, alpha_0, omega, &
                    &------------')
     if (.not. is_crystal) then
         if (.not. do_rpa) then
-            if ( is_in('E', mode) ) then
-                if ( allocated(mode_enes) ) deallocate(mode_enes)
-                allocate( mode_enes(1, 3*size(xyz, 1)) )
-            endif
-            if ( is_in('V', mode) ) then
-                if ( allocated(modes) ) deallocate(modes)
-                allocate( modes(3*size(xyz, 1), 3*size(xyz, 1)) )
-            endif
-            
-            ene = get_single_mbd_energy(blanked(mode,'R'), version,xyz,&
-                           alpha_0, omega, R_vdw, beta, a, overlap, C6,&
-                           damping_custom, potential_custom, unit_cell,&
-                           mode_enes(1,:), modes)
-            
-            if ( is_in('E', mode) ) then
-                call write_eigenenergies(mode_enes(1,:), &
+            !! eigenenergies and modes
+            if ( is_in('E', mode) .and. is_in('V', mode) ) then
+                if ( allocated(mode_eigs) ) deallocate(mode_eigs)
+                allocate( mode_eigs(1, 3*size(xyz, 1)) )
+                if ( allocated(eigmodes) ) deallocate(eigmodes)
+                allocate( eigmodes(3*size(xyz, 1), 3*size(xyz, 1)) )
+                ene = get_single_mbd_energy(blanked('R', mode), &
+                                     version, &
+                                     xyz, &
+                                     alpha_0, &
+                                     omega, &
+                                     R_vdw=R_vdw, &
+                                     beta=beta, &
+                                     a=a, &
+                                     overlap=overlap, &
+                                     C6=C6, &
+                                     damping_custom=damping_custom, &
+                                     potential_custom=potential_custom, &
+                                     unit_cell=unit_cell, &
+                                     mode_enes=mode_eigs(1,:), &
+                                     modes=eigmodes)
+                call write_eigenenergies(mode_eigs(1,:), &
                                          "mbd_eigenvalues.out")
-                deallocate(mode_enes)
-            endif
-            if ( is_in('V', mode) ) then
-                call DWRITEEIGVEC(modes, 'mbd_eigenmodes.out')
-                deallocate(modes)
+                deallocate(mode_eigs)
+                call DWRITEEIGVEC(eigmodes, 'mbd_eigenmodes.out')
+                deallocate(eigmodes)
+            !! eigenenergies
+            elseif ( is_in('E', mode) ) then
+                if ( allocated(mode_eigs) ) deallocate(mode_eigs)
+                allocate( mode_eigs(1, 3*size(xyz, 1)) )
+                ene = get_single_mbd_energy(blanked('R', mode), &
+                                     version, &
+                                     xyz, & 
+                                     alpha_0, &
+                                     omega, &
+                                     R_vdw=R_vdw, &
+                                     beta=beta, &
+                                     a=a, & 
+                                     overlap=overlap, &
+                                     C6=C6, &
+                                     damping_custom=damping_custom, &
+                                     potential_custom=potential_custom, &
+                                     unit_cell=unit_cell, &
+                                     mode_enes=mode_eigs(1,:))
+                call write_eigenenergies(mode_eigs(1,:), &
+                                         "mbd_eigenvalues.out")
+                deallocate(mode_eigs)
+            !! eigenmodes
+            elseif ( is_in('V', mode) ) then
+                if ( allocated(eigmodes) ) deallocate(eigmodes)
+                allocate( eigmodes(3*size(xyz, 1), 3*size(xyz, 1)) )
+                ene = get_single_mbd_energy(blanked('R', mode), &
+                                     version, &
+                                     xyz, & 
+                                     alpha_0, &
+                                     omega, &
+                                     R_vdw=R_vdw, &
+                                     beta=beta, &
+                                     a=a, & 
+                                     overlap=overlap, &
+                                     C6=C6, &
+                                     damping_custom=damping_custom, &
+                                     potential_custom=potential_custom, &
+                                     unit_cell=unit_cell, &
+                                     modes=eigmodes)
+                call DWRITEEIGVEC(eigmodes, 'mbd_eigenmodes.out')
+                deallocate(eigmodes)
+            !! only total mbd energy
+            else
+                ene = get_single_mbd_energy(blanked('R', mode), &
+                                     version, &
+                                     xyz, & 
+                                     alpha_0, &
+                                     omega, &
+                                     R_vdw=R_vdw, &
+                                     beta=beta, &
+                                     a=a, & 
+                                     overlap=overlap, &
+                                     C6=C6, &
+                                     damping_custom=damping_custom, &
+                                     potential_custom=potential_custom, &
+                                     unit_cell=unit_cell)
             endif
         else
             allocate (alpha(0:n_grid_omega, size(alpha_0)))
-            alpha = alpha_dynamic_ts_all(blanked(mode,'R'),n_grid_omega,&
-                                         alpha_0, C6, omega)
+            alpha = alpha_dynamic_ts_all(mode, n_grid_omega, alpha_0, &
+                                         C6, omega)
             ene = get_single_rpa_energy(mode, version, xyz, alpha,R_vdw,&
                                   beta, a, overlap, C6, damping_custom, &
                                   potential_custom, unit_cell)
@@ -1010,39 +1071,118 @@ function get_mbd_energy(mode, version, xyz, alpha_0, omega, &
         end if
     else
         if (is_reciprocal) then
-            if ( is_in('E', mode) ) then
-                if ( allocated(mode_enes) ) deallocate(mode_enes)
-                allocate( mode_enes(size(k_grid, 1), 3*size(xyz, 1)) )
-            endif
-            if ( is_in('V', mode) ) then
-                if ( allocated(modes) ) deallocate(modes)
-                allocate( modes_k(size(k_grid, 1), 3*size(xyz, 1), &
+            !! eigenenergies and modes
+            if ( is_in('E', mode) .and. is_in('V', mode) ) then
+                if ( allocated(mode_eigs) ) deallocate(mode_eigs)
+                allocate( mode_eigs(size(k_grid, 1), 3*size(xyz, 1)) )
+                if ( allocated(eigmodes_k) ) deallocate(eigmodes_k)
+                allocate( eigmodes_k(size(k_grid, 1), 3*size(xyz, 1), &
                                   3*size(xyz, 1)) )
-            endif
-            
-            ene = get_reciprocal_mbd_energy(mode, version, xyz, alpha_0,&
-                           omega, k_grid, unit_cell, R_vdw, beta, a, &
-                           overlap, C6, damping_custom,potential_custom,&
-                           mode_enes, modes_k)
-            
-            if ( is_in('E', mode) ) then
+                
+                ene = get_reciprocal_mbd_energy(mode, &
+                                     version, &
+                                     xyz, &
+                                     alpha_0, &
+                                     omega, &
+                                     k_grid, &
+                                     unit_cell, &
+                                     R_vdw=R_vdw, &
+                                     beta=beta, &
+                                     a=a, &
+                                     overlap=overlap, &
+                                     C6=C6, &
+                                     damping_custom=damping_custom, &
+                                     potential_custom=potential_custom, &
+                                     mode_enes=mode_eigs, &
+                                     modes=eigmodes_k)
+                
                 do i_kpt = 1, size(k_grid, 1)
-                    call write_eigenenergies(mode_enes(i_kpt,:), &
+                    call write_eigenenergies(mode_eigs(i_kpt,:), &
                                "mbd_eigenvalues_reciprocal.out", &
                                          k_point=k_grid(i_kpt, :))
                 enddo
-                deallocate(mode_enes)
-            endif
-            if ( is_in('V', mode) ) then
+                deallocate(mode_eigs)
                 do i_kpt = 1, size(k_grid, 1)
                     if (is_parallel) then
                         if (my_task /= modulo(i_kpt, n_tasks)) cycle
                     endif
-                    call ZWRITEEIGVEC(modes_k(i_kpt, :, :), &
+                    call ZWRITEEIGVEC(eigmodes_k(i_kpt, :, :), &
                      "mbd_eigenmodes_kpt"//trim(tostr(i_kpt))//".out", &
                      k_grid(i_kpt,:))
                 enddo
-                deallocate(modes_k)
+                deallocate(eigmodes_k)
+            !! eigenenergies
+            elseif ( is_in('E', mode) ) then
+                if ( allocated(mode_eigs) ) deallocate(mode_eigs)
+                allocate( mode_eigs(size(k_grid, 1), 3*size(xyz, 1)) )
+                
+                ene = get_reciprocal_mbd_energy(mode, &
+                                     version, &
+                                     xyz, &
+                                     alpha_0, &
+                                     omega, &
+                                     k_grid, &
+                                     unit_cell, &
+                                     R_vdw=R_vdw, &
+                                     beta=beta, &
+                                     a=a, &
+                                     overlap=overlap, &
+                                     C6=C6, &
+                                     damping_custom=damping_custom, &
+                                     potential_custom=potential_custom, &
+                                     mode_enes=mode_eigs)
+                
+                do i_kpt = 1, size(k_grid, 1)
+                    call write_eigenenergies(mode_eigs(i_kpt,:), &
+                               "mbd_eigenvalues_reciprocal.out", & 
+                                         k_point=k_grid(i_kpt, :))
+                enddo
+                deallocate(mode_eigs)
+            !! eigenmodes
+            elseif ( is_in('V', mode) ) then
+                if ( allocated(eigmodes_k) ) deallocate(eigmodes_k)
+                allocate( eigmodes_k(size(k_grid, 1), 3*size(xyz, 1), &
+                                  3*size(xyz, 1)) )
+                ene = get_reciprocal_mbd_energy(mode, &
+                                     version, &
+                                     xyz, &
+                                     alpha_0, &
+                                     omega, &
+                                     k_grid, &
+                                     unit_cell, &
+                                     R_vdw=R_vdw, &
+                                     beta=beta, &
+                                     a=a, &
+                                     overlap=overlap, &
+                                     C6=C6, &
+                                     damping_custom=damping_custom, &
+                                     potential_custom=potential_custom, &
+                                     modes=eigmodes_k)
+                do i_kpt = 1, size(k_grid, 1)
+                    if (is_parallel) then
+                        if (my_task /= modulo(i_kpt, n_tasks)) cycle
+                    endif
+                    call ZWRITEEIGVEC(eigmodes_k(i_kpt, :, :), &
+                     "mbd_eigenmodes_kpt"//trim(tostr(i_kpt))//".out", &
+                     k_grid(i_kpt,:))
+                enddo
+                deallocate(eigmodes_k)
+            !! only total mbd energy
+            else
+                ene = get_reciprocal_mbd_energy(mode, &
+                                     version, &
+                                     xyz, &
+                                     alpha_0, &
+                                     omega, &
+                                     k_grid, &
+                                     unit_cell, &
+                                     R_vdw=R_vdw, &
+                                     beta=beta, &
+                                     a=a, &
+                                     overlap=overlap, &
+                                     C6=C6, &
+                                     damping_custom=damping_custom, &
+                                     potential_custom=potential_custom)
             endif
         else
             ene = get_supercell_mbd_energy(mode, version, xyz, alpha_0, &
@@ -1197,12 +1337,12 @@ function get_single_mbd_energy(mode, version, xyz, alpha_0, omega, R_vdw, &
         relay=relay)
     do i_atom = 1, size(xyz, 1)
         do j_atom = 1, size(xyz, 1)
-            i = 3*(i_atom-1)
-            j = 3*(j_atom-1)
-            relay(i+1:i+3, j+1:j+3) = & ! relay = sqrt(a*a)*w*w*T
+            i = 3*i_atom-2
+            j = 3*j_atom-2
+            relay(i:i+2, j:j+2) = & ! relay = sqrt(a*a)*w*w*T
                 omega(i_atom)*omega(j_atom) &
                 *sqrt(alpha_0(i_atom)*alpha_0(j_atom))* &
-                relay(i+1:i+3, j+1:j+3)
+                relay(i:i+2, j:j+2)
         end do
     end do
     do i_atom = 1, size(xyz, 1)
@@ -1284,7 +1424,10 @@ function get_reciprocal_mbd_energy(mode, version, xyz, alpha_0, omega, &
     else
         mute = ''
     end if
-    alpha_ts = alpha_dynamic_ts_all('O', n_grid_omega, alpha_0, omega=omega)
+    if (do_rpa) then
+        alpha_ts = alpha_dynamic_ts_all('O', n_grid_omega, alpha_0, &
+                                        omega=omega)
+    endif
     ene = 0.d0
     if (get_eigenvalues .and. get_eigenvectors) then
         mode_enes(:, :) = 0.d0
@@ -1350,7 +1493,6 @@ function get_reciprocal_mbd_energy(mode, version, xyz, alpha_0, omega, &
                     mode_enes=mode_enes(i_kpt, :), &
                     modes=modes(i_kpt, :, :))
             else
-                write(*,*) "starting get_single_reciprocal_mbd_ene..."
                 ene = ene+get_single_reciprocal_mbd_ene( &
                     blanked('P', mode)//mute, &
                     version, &
@@ -1435,12 +1577,12 @@ function get_single_reciprocal_mbd_ene(mode, version, xyz, alpha_0, omega, &
         relay_c=relay)
     do i_atom = 1, size(xyz, 1)
         do j_atom = 1, size(xyz, 1)
-            i = 3*(i_atom-1)
-            j = 3*(j_atom-1)
-            relay(i+1:i+3, j+1:j+3) = & ! relay = sqrt(a*a)*w*w*T
+            i = 3*i_atom-2
+            j = 3*j_atom-2
+            relay(i:i+2, j:j+2) = & ! relay = sqrt(a*a)*w*w*T
                 omega(i_atom)*omega(j_atom) &
                 *sqrt(alpha_0(i_atom)*alpha_0(j_atom))* &
-                relay(i+1:i+3, j+1:j+3)
+                relay(i:i+2, j:j+2)
         enddo
     enddo
     do i_atom = 1, size(xyz, 1)
@@ -1966,6 +2108,7 @@ subroutine diagonalize_sym_dble_(mode, A, eigs)
     real(8), intent(inout) :: A(:, :)
     real(8), intent(out) :: eigs(size(A, 1))
     
+    real(8) :: lwork_arr
     real(8), allocatable :: work_arr(:), vecs(:,:)
     integer :: n, vl, vu, il, iu, nvals
     integer, allocatable  :: iwork_arr(:), isupp(:)
@@ -1975,14 +2118,14 @@ subroutine diagonalize_sym_dble_(mode, A, eigs)
     if ( allocated(work_arr) ) deallocate(work_arr)
     allocate( work_arr(1) )
     selectcase(trim(eigensolver))
-        case("qr")        !! QR algorithm: less fast, minimal memory requirement
+        case("qr")        !! QR algorithm: medium fast, minimal memory requirement
             call DSYEV(mode, "U", n, A, n, eigs, work_arr, -1, error_flag)
             lwork = nint(work_arr(1))
             deallocate(work_arr)
-            allocate (work_arr(lwork))
+            allocate ( work_arr(lwork) )
             call DSYEV(mode, "U", n, A, n, eigs, work_arr, lwork, error_flag)
         
-        case("dandc")     !! Divide & Conquer: fast, high memory requirement
+        case("dandc")     !! Divide & Conquer: fast, higher memory requirement
             if ( allocated(iwork_arr) ) deallocate(iwork_arr)
             allocate( iwork_arr(1) )
             call DSYEVD(mode, "U", n, A, n, eigs, work_arr, -1, &
@@ -1994,17 +2137,17 @@ subroutine diagonalize_sym_dble_(mode, A, eigs)
             allocate (work_arr(lwork))
             allocate (iwork_arr(liwork))
             call DSYEVD(mode, "U", n, A, n, eigs, work_arr, lwork, &
-                       iwork_arr, liwork, error_flag)
+                        iwork_arr, liwork, error_flag)
             if ( allocated(iwork_arr) ) deallocate(iwork_arr)
         
-        case("mrrr")      !! MRRR algorithm: fast, medium memory requirement
+        case("mrrr")      !! MRRR algorithm: medium memory requirement
             if ( allocated(isupp) ) deallocate(isupp)
             allocate( isupp(2*n), stat=error_flag)
             if ( allocated(vecs) ) deallocate(vecs)
             allocate( vecs(n,n) )
             if ( allocated(iwork_arr) ) deallocate(iwork_arr)
             allocate( iwork_arr(1) )
-            call DSYEVR(mode, "A", "U", n, A, n, vl, vu, il, iu, 1.d-16, &
+            call DSYEVR(mode, "A", "U", n, A, n, vl, vu, il, iu, 1.d-10, &
                         nvals, eigs, vecs, n, isupp, work_arr, -1, &
                         iwork_arr, -1, error_flag)
             lwork = nint(work_arr(1))
@@ -2013,7 +2156,7 @@ subroutine diagonalize_sym_dble_(mode, A, eigs)
             deallocate(iwork_arr)
             allocate (work_arr(lwork))
             allocate (iwork_arr(liwork))
-            call DSYEVR(mode, "A", "U", n, A, n, vl, vu, il, iu, 1.d-16, &
+            call DSYEVR(mode, "A", "U", n, A, n, vl, vu, il, iu, 1.d-10, &
                         nvals, eigs, vecs, n, isupp, work_arr, lwork, &
                         iwork_arr, liwork, error_flag)
             A = vecs
@@ -2023,7 +2166,6 @@ subroutine diagonalize_sym_dble_(mode, A, eigs)
     
     endselect
     deallocate (work_arr)
-    
     if (error_flag /= 0) then
         call print_log( &
             "DSYEVx failed in module mbd with error code " &
@@ -2119,7 +2261,7 @@ subroutine diagonalize_he_cmplx_(mode, A, eigs)
     integer :: vl, vu, il, iu, nvals
     integer :: n, lwork, lrwork, liwork
     integer :: error_flag
-    integer, external :: ILAENV
+    
     
     n = size(A, 1)
     if ( allocated(rwork) ) deallocate(rwork)
@@ -2165,7 +2307,7 @@ subroutine diagonalize_he_cmplx_(mode, A, eigs)
             allocate( vecs(n,n) )
             if ( allocated(isupp) ) deallocate(isupp)
             allocate( isupp(2*n) )
-            call ZHEEVR(mode, "A", "U", n, A, n, vl, vu, il, iu, 1.d-16, &
+            call ZHEEVR(mode, "A", "U", n, A, n, vl, vu, il, iu, 1.d-10, &
                         nvals, eigs, vecs, n, isupp, work, -1, rwork, &
                         -1, iwork, -1, error_flag)
             lwork = nint( dble( work(1) ) )
@@ -2177,7 +2319,7 @@ subroutine diagonalize_he_cmplx_(mode, A, eigs)
             allocate (work(lwork))
             allocate (rwork(lrwork))
             allocate (iwork(liwork))
-            call ZHEEVR(mode, "A", "U", n, A, n, vl, vu, il, iu, 1.d-16, &
+            call ZHEEVR(mode, "A", "U", n, A, n, vl, vu, il, iu, 1.d-10, &
                         nvals, eigs, vecs, n, isupp, work, lwork, rwork, &
                         lrwork, iwork, liwork, error_flag)
             A = vecs
@@ -2188,7 +2330,6 @@ subroutine diagonalize_he_cmplx_(mode, A, eigs)
     endselect
     deallocate(rwork)
     deallocate(work)
-    
     if (error_flag /= 0) then
         call print_error( &
             "ZHEEVx failed in module mbd with error code " &
@@ -2292,7 +2433,8 @@ function get_ts_energy_lowmem(mode, version, xyz, C6, alpha_0, R_vdw, &
     
     real(8)  :: C6_ij, r(3), r_norm, f_damp, R_vdw_ij, ene_shell, &
                 ene_pair, R_cell(3)
-    integer  :: i_shell, i_cell, i_atom, j_atom, range_cell(3), idx_cell(3)
+    integer  :: i_shell, i_cell, i_atom, j_atom, range_cell(3), &
+                minr_cell(3), idx_cell(3)
     real(8), parameter :: shell_thickness = 10.d0
     logical  :: is_crystal, is_parallel
     
@@ -2310,9 +2452,10 @@ function get_ts_energy_lowmem(mode, version, xyz, C6, alpha_0, R_vdw, &
         else
             range_cell = (/ 0, 0, 0 /)
         endif
+        minr_cell = -1*range_cell
         idx_cell = (/ 0, 0, -1 /)
         do i_cell = 1, product(1+2*range_cell)
-            call shift_cell(idx_cell, -range_cell, range_cell)
+            call shift_cell(idx_cell, minr_cell, range_cell)
             ! MPI code begin
             if (is_parallel .and. is_crystal) then
                 if (my_task /= modulo(i_cell, n_tasks)) cycle
@@ -2473,14 +2616,12 @@ subroutine add_dipole_matrix_s(mode, version, xyz, row2glob, col2glob, &
             real_space_cutoff = param_dipole_cutoff
         endif
         range_cell = supercell_circum(unit_cell, real_space_cutoff)
-    else
-        range_cell(:) = 0
-    endif
-    if (is_crystal) then
         call print_log('Ewald: summing real part in cell vector range of ' &
             //trim(tostr(1+2*range_cell(1)))//'x' &
             //trim(tostr(1+2*range_cell(2)))//'x' &
             //trim(tostr(1+2*range_cell(3))), mute)
+    else
+        range_cell = (/ 0, 0, 0 /)
     endif
     call ts(11)
     idx_cell = (/ 0, 0, -1 /)
@@ -4151,7 +4292,7 @@ function get_FileID()
     integer, save  :: currentID = minFileID
     
     if (currentID > maxFileID) then
-        write(*,*) "error('get_FileID: No more free file identification numbers')"
+        call print_log("error('get_FileID: No more free file identification numbers')")
     end if
     get_FileID = currentID
     currentID = currentID + 1
