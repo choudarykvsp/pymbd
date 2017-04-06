@@ -977,88 +977,38 @@ function get_mbd_energy(mode, version, xyz, alpha_0, omega, &
                    &------------')
     if (.not. is_crystal) then
         if (.not. do_rpa) then
-            !! eigenenergies and modes
-            if ( is_in('E', mode) .and. is_in('V', mode) ) then
+            if ( is_in('E', mode) ) then
                 if ( allocated(mode_eigs) ) deallocate(mode_eigs)
                 allocate( mode_eigs(1, 3*size(xyz, 1)) )
+            endif
+            if ( is_in('V', mode) ) then
                 if ( allocated(eigmodes) ) deallocate(eigmodes)
                 allocate( eigmodes(3*size(xyz, 1), 3*size(xyz, 1)) )
-                ene = get_single_mbd_energy(blanked('R', mode), &
-                                     version, &
-                                     xyz, &
-                                     alpha_0, &
-                                     omega, &
-                                     R_vdw=R_vdw, &
-                                     beta=beta, &
-                                     a=a, &
-                                     overlap=overlap, &
-                                     C6=C6, &
-                                     damping_custom=damping_custom, &
-                                     potential_custom=potential_custom, &
-                                     unit_cell=unit_cell, &
-                                     mode_enes=mode_eigs(1,:), &
-                                     modes=eigmodes)
+            endif
+            ene = get_single_mbd_energy(blanked('R', mode), &
+                                    version, &
+                                    xyz, &
+                                    alpha_0, &
+                                    omega, &
+                                    R_vdw=R_vdw, &
+                                    beta=beta, &
+                                    a=a, &
+                                    overlap=overlap, &
+                                    C6=C6, &
+                                    damping_custom=damping_custom, &
+                                    potential_custom=potential_custom, &
+                                    unit_cell=unit_cell, &
+                                    mode_enes=mode_eigs(1,:), &
+                                    modes=eigmodes)
+            
+            if ( is_in('E', mode) ) then
                 call write_eigenenergies(mode_eigs(1,:), &
                                          "mbd_eigenvalues.out")
                 deallocate(mode_eigs)
+            endif
+            if ( is_in('V', mode) ) then
                 call DWRITEEIGVEC(eigmodes, 'mbd_eigenmodes.out')
                 deallocate(eigmodes)
-            !! eigenenergies
-            elseif ( is_in('E', mode) ) then
-                if ( allocated(mode_eigs) ) deallocate(mode_eigs)
-                allocate( mode_eigs(1, 3*size(xyz, 1)) )
-                ene = get_single_mbd_energy(blanked('R', mode), &
-                                     version, &
-                                     xyz, & 
-                                     alpha_0, &
-                                     omega, &
-                                     R_vdw=R_vdw, &
-                                     beta=beta, &
-                                     a=a, & 
-                                     overlap=overlap, &
-                                     C6=C6, &
-                                     damping_custom=damping_custom, &
-                                     potential_custom=potential_custom, &
-                                     unit_cell=unit_cell, &
-                                     mode_enes=mode_eigs(1,:))
-                call write_eigenenergies(mode_eigs(1,:), &
-                                         "mbd_eigenvalues.out")
-                deallocate(mode_eigs)
-            !! eigenmodes
-            elseif ( is_in('V', mode) ) then
-                if ( allocated(eigmodes) ) deallocate(eigmodes)
-                allocate( eigmodes(3*size(xyz, 1), 3*size(xyz, 1)) )
-                ene = get_single_mbd_energy(blanked('R', mode), &
-                                     version, &
-                                     xyz, & 
-                                     alpha_0, &
-                                     omega, &
-                                     R_vdw=R_vdw, &
-                                     beta=beta, &
-                                     a=a, & 
-                                     overlap=overlap, &
-                                     C6=C6, &
-                                     damping_custom=damping_custom, &
-                                     potential_custom=potential_custom, &
-                                     unit_cell=unit_cell, &
-                                     modes=eigmodes)
-                call DWRITEEIGVEC(eigmodes, 'mbd_eigenmodes.out')
-                deallocate(eigmodes)
-            !! only total mbd energy
-            else
-                ene = get_single_mbd_energy(blanked('R', mode), &
-                                     version, &
-                                     xyz, & 
-                                     alpha_0, &
-                                     omega, &
-                                     R_vdw=R_vdw, &
-                                     beta=beta, &
-                                     a=a, & 
-                                     overlap=overlap, &
-                                     C6=C6, &
-                                     damping_custom=damping_custom, &
-                                     potential_custom=potential_custom, &
-                                     unit_cell=unit_cell)
             endif
         else
             allocate (alpha(0:n_grid_omega, size(alpha_0)))
@@ -1071,15 +1021,16 @@ function get_mbd_energy(mode, version, xyz, alpha_0, omega, &
         end if
     else
         if (is_reciprocal) then
-            !! eigenenergies and modes
-            if ( is_in('E', mode) .and. is_in('V', mode) ) then
+            if ( is_in('E', mode) ) then
                 if ( allocated(mode_eigs) ) deallocate(mode_eigs)
-                allocate( mode_eigs(size(k_grid, 1), 3*size(xyz, 1)) )
-                if ( allocated(eigmodes_k) ) deallocate(eigmodes_k)
-                allocate( eigmodes_k(size(k_grid, 1), 3*size(xyz, 1), &
-                                  3*size(xyz, 1)) )
-                
-                ene = get_reciprocal_mbd_energy(mode, &
+                allocate( mode_eigs(1, 3*size(xyz, 1)) )
+            endif
+            if ( is_in('V', mode) ) then
+                if ( allocated(eigmodes) ) deallocate(eigmodes)
+                allocate( eigmodes(3*size(xyz, 1), 3*size(xyz, 1)) )
+            endif
+            
+            ene = get_reciprocal_mbd_energy(mode, &
                                      version, &
                                      xyz, &
                                      alpha_0, &
@@ -1095,13 +1046,16 @@ function get_mbd_energy(mode, version, xyz, alpha_0, omega, &
                                      potential_custom=potential_custom, &
                                      mode_enes=mode_eigs, &
                                      modes=eigmodes_k)
-                
+            
+            if ( is_in('E', mode) ) then
                 do i_kpt = 1, size(k_grid, 1)
                     call write_eigenenergies(mode_eigs(i_kpt,:), &
                                "mbd_eigenvalues_reciprocal.out", &
                                          k_point=k_grid(i_kpt, :))
                 enddo
                 deallocate(mode_eigs)
+            endif
+            if ( is_in('V', mode) ) then
                 do i_kpt = 1, size(k_grid, 1)
                     if (is_parallel) then
                         if (my_task /= modulo(i_kpt, n_tasks)) cycle
@@ -1111,78 +1065,6 @@ function get_mbd_energy(mode, version, xyz, alpha_0, omega, &
                      k_grid(i_kpt,:))
                 enddo
                 deallocate(eigmodes_k)
-            !! eigenenergies
-            elseif ( is_in('E', mode) ) then
-                if ( allocated(mode_eigs) ) deallocate(mode_eigs)
-                allocate( mode_eigs(size(k_grid, 1), 3*size(xyz, 1)) )
-                
-                ene = get_reciprocal_mbd_energy(mode, &
-                                     version, &
-                                     xyz, &
-                                     alpha_0, &
-                                     omega, &
-                                     k_grid, &
-                                     unit_cell, &
-                                     R_vdw=R_vdw, &
-                                     beta=beta, &
-                                     a=a, &
-                                     overlap=overlap, &
-                                     C6=C6, &
-                                     damping_custom=damping_custom, &
-                                     potential_custom=potential_custom, &
-                                     mode_enes=mode_eigs)
-                
-                do i_kpt = 1, size(k_grid, 1)
-                    call write_eigenenergies(mode_eigs(i_kpt,:), &
-                               "mbd_eigenvalues_reciprocal.out", & 
-                                         k_point=k_grid(i_kpt, :))
-                enddo
-                deallocate(mode_eigs)
-            !! eigenmodes
-            elseif ( is_in('V', mode) ) then
-                if ( allocated(eigmodes_k) ) deallocate(eigmodes_k)
-                allocate( eigmodes_k(size(k_grid, 1), 3*size(xyz, 1), &
-                                  3*size(xyz, 1)) )
-                ene = get_reciprocal_mbd_energy(mode, &
-                                     version, &
-                                     xyz, &
-                                     alpha_0, &
-                                     omega, &
-                                     k_grid, &
-                                     unit_cell, &
-                                     R_vdw=R_vdw, &
-                                     beta=beta, &
-                                     a=a, &
-                                     overlap=overlap, &
-                                     C6=C6, &
-                                     damping_custom=damping_custom, &
-                                     potential_custom=potential_custom, &
-                                     modes=eigmodes_k)
-                do i_kpt = 1, size(k_grid, 1)
-                    if (is_parallel) then
-                        if (my_task /= modulo(i_kpt, n_tasks)) cycle
-                    endif
-                    call ZWRITEEIGVEC(eigmodes_k(i_kpt, :, :), &
-                     "mbd_eigenmodes_kpt"//trim(tostr(i_kpt))//".out", &
-                     k_grid(i_kpt,:))
-                enddo
-                deallocate(eigmodes_k)
-            !! only total mbd energy
-            else
-                ene = get_reciprocal_mbd_energy(mode, &
-                                     version, &
-                                     xyz, &
-                                     alpha_0, &
-                                     omega, &
-                                     k_grid, &
-                                     unit_cell, &
-                                     R_vdw=R_vdw, &
-                                     beta=beta, &
-                                     a=a, &
-                                     overlap=overlap, &
-                                     C6=C6, &
-                                     damping_custom=damping_custom, &
-                                     potential_custom=potential_custom)
             endif
         else
             ene = get_supercell_mbd_energy(mode, version, xyz, alpha_0, &
@@ -1206,22 +1088,24 @@ function get_supercell_mbd_energy(mode, version, xyz, alpha_0, omega, &
         beta, a, &
         C6(size(xyz, 1))
     real(8), intent(out), optional :: rpa_orders(20)
+    
     real(8) :: ene
-
+    
     logical :: do_rpa, get_orders
     real(8) :: R_cell(3)
     integer :: i_atom, i
     integer :: i_cell
     integer :: idx_cell(3), n_cells
-
+    
     real(8), allocatable :: &
         xyz_super(:, :), alpha_0_super(:), omega_super(:), &
         R_vdw_super(:), C6_super(:), alpha_ts_super(:, :)
     real(8) :: unit_cell_super(3, 3)
-
+    
+    
     do_rpa = is_in('Q', mode)
     get_orders = is_in('O', mode)
-
+    
     n_cells = product(supercell)
     do i = 1, 3
         unit_cell_super(i, :) = unit_cell(i, :)*supercell(i)
@@ -1308,18 +1192,20 @@ function get_single_mbd_energy(mode, version, xyz, alpha_0, omega, R_vdw, &
     real(8), intent(out), optional :: &
         mode_enes(3*size(xyz, 1)), &
         modes(3*size(xyz, 1), 3*size(xyz, 1))
+    
     real(8) :: ene
-
+    
     real(8) :: relay(3*size(xyz, 1), 3*size(xyz, 1))
     real(8) :: eigs(3*size(xyz, 1))
     integer :: i_atom, j_atom, i_xyz, i, j
     integer :: n_negative_eigs
     logical :: get_eigenvalues, get_eigenvectors, is_parallel
-
+    
+    
     get_eigenvalues = is_in('E', mode)
     get_eigenvectors = is_in('V', mode)
     is_parallel = is_in('P', mode)
-
+    
     relay(:, :) = 0.d0
     call add_dipole_matrix( & ! relay = T
         mode, &
@@ -1406,14 +1292,16 @@ function get_reciprocal_mbd_energy(mode, version, xyz, alpha_0, omega, &
         rpa_orders(size(k_grid, 1), 20)
     complex(8), intent(out), optional :: &
         modes(size(k_grid, 1), 3*size(xyz, 1), 3*size(xyz, 1))
+    
     real(8) :: ene
-
+    
     logical :: &
         is_parallel, do_rpa, get_orders, get_eigenvalues, get_eigenvectors
     integer :: i_kpt
     real(8) :: k_point(3), alpha_ts(0:n_grid_omega, size(xyz, 1))
     character(len=1) :: mute
-
+    
+    
     is_parallel = is_in('P', mode)
     do_rpa = is_in('Q', mode)
     get_eigenvalues= is_in('E', mode)
@@ -1547,18 +1435,20 @@ function get_single_reciprocal_mbd_ene(mode, version, xyz, alpha_0, omega, &
         potential_custom(size(xyz, 1), size(xyz, 1), 3, 3)
     real(8), intent(out), optional :: mode_enes(3*size(xyz, 1))
     complex(8), intent(out), optional :: modes(3*size(xyz, 1), 3*size(xyz, 1))
+    
     real(8) :: ene
-
+    
     complex(8) :: relay(3*size(xyz, 1), 3*size(xyz, 1))
     real(8) :: eigs(3*size(xyz, 1))
     integer :: i_atom, j_atom, i_xyz, i, j
     integer :: n_negative_eigs
     logical :: get_eigenvalues, get_eigenvectors, is_parallel
-
+    
+    
     get_eigenvalues = is_in('E', mode)
     get_eigenvectors = is_in('V', mode)
     is_parallel = is_in('P', mode)
-
+    
     relay(:, :) = cmplx(0.d0, 0.d0, 8)
     call add_dipole_matrix( & ! relay = T
         mode, &
@@ -1640,15 +1530,17 @@ function get_single_rpa_energy(mode, version, xyz, alpha, R_vdw, beta, &
         potential_custom(size(xyz, 1), size(xyz, 1), 3, 3), &
         unit_cell(3, 3)
     real(8), intent(out), optional :: rpa_orders(20)
+    
     real(8) :: ene
-
+    
     real(8), dimension(3*size(xyz, 1), 3*size(xyz, 1)) :: relay, AT
     complex(8) :: eigs(3*size(xyz, 1))
     integer :: i_atom, i_xyz, i_grid_omega, i
     integer :: n_order, n_negative_eigs
     logical :: is_parallel, get_orders
     character(len=1) :: mute
-
+    
+    
     is_parallel = is_in('P', mode)
     get_orders = is_in('O', mode)
     if (is_in('M', mode)) then
@@ -1656,7 +1548,7 @@ function get_single_rpa_energy(mode, version, xyz, alpha, R_vdw, beta, &
     else
         mute = ''
     end if
-
+    
     ene = 0.d0
     do i_grid_omega = 0, n_grid_omega
         ! MPI code begin
@@ -1743,15 +1635,17 @@ function get_single_reciprocal_rpa_ene(mode, version, xyz, alpha, k_point, &
         damping_custom(size(xyz, 1), size(xyz, 1)), &
         potential_custom(size(xyz, 1), size(xyz, 1), 3, 3)
     real(8), intent(out), optional :: rpa_orders(20)
+    
     real(8) :: ene
-
+    
     complex(8), dimension(3*size(xyz, 1), 3*size(xyz, 1)) :: relay, AT
     complex(8) :: eigs(3*size(xyz, 1))
     integer :: i_atom, i_xyz, i_grid_omega, i
     integer :: n_order, n_negative_eigs
     logical :: is_parallel, get_orders
     character(len=1) :: mute
-
+    
+    
     is_parallel = is_in('P', mode)
     get_orders = is_in('O', mode)
     if (is_in('M', mode)) then
@@ -1759,7 +1653,7 @@ function get_single_reciprocal_rpa_ene(mode, version, xyz, alpha, k_point, &
     else
         mute = ''
     end if
-
+    
     do i_grid_omega = 0, n_grid_omega
         ! MPI code begin
         if (is_parallel) then
@@ -2596,6 +2490,7 @@ subroutine add_dipole_matrix_s(mode, version, xyz, row2glob, col2glob, &
                 range_cell(3), i, j, i_xyz
     logical  :: is_crystal, is_reciprocal, is_low_dim, mute, do_ewald
     
+    
     is_reciprocal = is_in('R', mode)
     is_crystal = is_in('C', mode) .or. is_reciprocal
     is_low_dim = any(param_vacuum_axis)
@@ -2772,6 +2667,7 @@ subroutine add_ewald_dipole_parts_s(mode, xyz, unit_cell, alpha, &
     complex(8)  :: Tpp_c(3, 3)
     integer     :: i_local, j_local, i_atom, j_atom, i, j, i_xyz, &
                    j_xyz, idx_G_vector(3), i_G_vector, range_G_vector(3)
+    
     
     is_reciprocal = is_in('R', mode)
     mute = is_in('M', mode)
@@ -3379,8 +3275,6 @@ function get_supercell_mbd_energy_s(mode, version, xyz, alpha_0, omega, &
     allocate (R_vdw_super(n_cells*size(R_vdw)))
     allocate (C6_super(n_cells*size(C6)))
     idx_cell = (/ 0, 0, -1 /)
-    !! TODO: we could switch to simple MPI loop parallelism
-    !!       (and subsequent broadcast) for the following
     do i_cell = 1, n_cells
         call shift_cell(idx_cell, (/ 0, 0, 0 /), supercell-1)
         R_cell = matmul(idx_cell, unit_cell)
@@ -3604,7 +3498,7 @@ function get_single_mbd_energy_s(mode, version, xyz, alpha_0, omega, &
         if ( allocated(my_evecs) ) deallocate(my_evecs)
         allocate( my_evecs(my_nrows3n, my_ncols3n), stat=ierr)
         
-        selectcase(eigensolver)
+        selectcase(trim(eigensolver))
             case("qr")        !! QR algorithm (slow, minimum memory)
                 call PDSYEV('V', 'U', size3n, my_relay, 1, 1, desc3n3n, &
                             eigs, my_evecs, 1, 1, desc3n3n, my_cfdm_work, &
@@ -3663,7 +3557,7 @@ function get_single_mbd_energy_s(mode, version, xyz, alpha_0, omega, &
         deallocate(my_write_work)
     
     else
-        selectcase(eigensolver)
+        selectcase(trim(eigensolver))
             case("qr")
                 !! allocate dummy for eigenvectors
                 if ( allocated(my_evecs) ) deallocate(my_evecs)
@@ -4040,7 +3934,7 @@ function get_single_reciprocal_mbd_ene_s(mode, version, xyz, alpha_0, &
         if ( allocated(my_evecs) ) deallocate(my_evecs)
         allocate( my_evecs(my_nrows3n, my_ncols3n), stat=ierr)
         
-        selectcase(eigensolver)
+        selectcase(trim(eigensolver))
             case("qr")        !! QR algorithm (slow, minimal memory)
                 !! manually define size of work space arrays
                 my_cfdm_lwork = fb3n*(nrows_max+ncols_max+fb3n) + 3*size3n + &
@@ -4109,7 +4003,7 @@ function get_single_reciprocal_mbd_ene_s(mode, version, xyz, alpha_0, &
                           0, 0, my_write_work, k_point)
         deallocate(my_write_work)
     else
-        selectcase(eigensolver)
+        selectcase(trim(eigensolver))
             case ("qr")        !! QR algorithm (slow, minimal memory)
                 !! dummy for eigenvectors
                 if ( allocated(my_evecs) ) deallocate(my_evecs)
