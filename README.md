@@ -15,6 +15,7 @@ See the Jupyter notebook in `playground.ipynb`.
 
 ScaLAPACK routines have the suffix `_s`, e.g. `mbd_scalapack.get_mbd_energy_s(...)` instead of `mbd.get_mbd_energy(...)`. However, original MPI/LAPACK routines (such as `get_mbd_energy`) are still available in `mbd_scalapack`. Hence, `mbd_scalapack.get_mbd_energy(...)` will call MPI/LAPACK routine and `mbd_scalapack.get_mbd_energy_s(...)` calls the ScaLAPACK version of it.
 
+Latest version support use of different (Sca)LAPACK eigensolvers ("QR", "Divide and Conquer", "MR3")
 
 Example in python (after compiling corresponding MBD module):
 
@@ -29,6 +30,7 @@ mbd.init_grid(<n_omega_SCS>)
 mbd.param_vacuum_axis = <vacuum_axis(x,y,z)>
 mbd.my_task = MPI.COMM_WORLD.Get_rank()
 mbd.n_tasks = MPI.COMM_WORLD.Get_size()
+mbd.eigensolver = <'qr'/'dandc'/'mrrr'>
 alpha_free, C6_free, RvdW_free = get_free_atom_data(<symbols>)
 
 ... rescaling of dispersion parameters ~> alpha_0_eff, C6_eff, RvdW_eff ...
@@ -63,7 +65,7 @@ mbd.destroy_grid()
 `
 
 ### Format of eigenmode/eigenenergy output
-(calling from top-level `get_mbd_energy` instance and in ScaLAPACK framework create output files)
+(calling top-level `get_mbd_energy` instance in LAPACK and all related routines in ScaLAPACK framework create output files)
 
 . eigenenergies: formatted text file `mbd_eigenvalues(_reciprocal).out` sorted by k points (if applicable)
 

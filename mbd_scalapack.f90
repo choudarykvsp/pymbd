@@ -1023,11 +1023,12 @@ function get_mbd_energy(mode, version, xyz, alpha_0, omega, &
         if (is_reciprocal) then
             if ( is_in('E', mode) ) then
                 if ( allocated(mode_eigs) ) deallocate(mode_eigs)
-                allocate( mode_eigs(1, 3*size(xyz, 1)) )
+                allocate( mode_eigs(size(k_grid, 1), 3*size(xyz, 1)) )
             endif
             if ( is_in('V', mode) ) then
-                if ( allocated(eigmodes) ) deallocate(eigmodes)
-                allocate( eigmodes(3*size(xyz, 1), 3*size(xyz, 1)) )
+                if ( allocated(eigmodes_k) ) deallocate(eigmodes_k)
+                allocate( eigmodes_k(size(k_grid, 1), 3*size(xyz, 1), &
+                                     3*size(xyz, 1)) )
             endif
             
             ene = get_reciprocal_mbd_energy(mode, &
@@ -1317,10 +1318,8 @@ function get_reciprocal_mbd_energy(mode, version, xyz, alpha_0, omega, &
                                         omega=omega)
     endif
     ene = 0.d0
-    if (get_eigenvalues .and. get_eigenvectors) then
-        mode_enes(:, :) = 0.d0
-        modes(:, :, :) = 0.d0
-    end if
+    if (get_eigenvalues) mode_enes(:, :) = 0.d0
+    if (get_eigenvectors) modes(:, :, :) = 0.d0
     do i_kpt = 1, size(k_grid, 1)
         ! MPI code begin
         if (is_parallel) then
@@ -1364,38 +1363,75 @@ function get_reciprocal_mbd_energy(mode, version, xyz, alpha_0, omega, &
         else
             if (get_eigenvalues .and. get_eigenvectors) then
                 ene = ene+get_single_reciprocal_mbd_ene( &
-                    blanked('P', mode)//mute, &
-                    version, &
-                    xyz, &
-                    alpha_0, &
-                    omega, &
-                    k_point, &
-                    unit_cell, &
-                    R_vdw=R_vdw, &
-                    beta=beta, &
-                    a=a, &
-                    overlap=overlap, &
-                    C6=C6, &
-                    damping_custom=damping_custom, &
-                    potential_custom=potential_custom, &
-                    mode_enes=mode_enes(i_kpt, :), &
-                    modes=modes(i_kpt, :, :))
+                                    blanked('P', mode)//mute, &
+                                    version, &
+                                    xyz, &
+                                    alpha_0, &
+                                    omega, &
+                                    k_point, &
+                                    unit_cell, &
+                                    R_vdw=R_vdw, &
+                                    beta=beta, &
+                                    a=a, &
+                                    overlap=overlap, &
+                                    C6=C6, &
+                                    damping_custom=damping_custom, &
+                                    potential_custom=potential_custom, &
+                                    mode_enes=mode_enes(i_kpt, :), &
+                                    modes=modes(i_kpt, :, :) )
+            
+            elseif (get_eigenvalues) then
+                ene = ene+get_single_reciprocal_mbd_ene( &
+                                    blanked('P', mode)//mute, &
+                                    version, &
+                                    xyz, &
+                                    alpha_0, &
+                                    omega, &
+                                    k_point, &
+                                    unit_cell, &
+                                    R_vdw=R_vdw, &
+                                    beta=beta, &
+                                    a=a, &
+                                    overlap=overlap, &
+                                    C6=C6, &
+                                    damping_custom=damping_custom, &
+                                    potential_custom=potential_custom, &
+                                    mode_enes=mode_enes(i_kpt, :) )
+            
+            elseif (get_eigenvectors) then
+                ene = ene+get_single_reciprocal_mbd_ene( &
+                                    blanked('P', mode)//mute, &
+                                    version, &
+                                    xyz, &
+                                    alpha_0, &
+                                    omega, &
+                                    k_point, &
+                                    unit_cell, &
+                                    R_vdw=R_vdw, &
+                                    beta=beta, &
+                                    a=a, &
+                                    overlap=overlap, &
+                                    C6=C6, &
+                                    damping_custom=damping_custom, &
+                                    potential_custom=potential_custom, &
+                                    modes=modes(i_kpt, :, :) )
+            
             else
                 ene = ene+get_single_reciprocal_mbd_ene( &
-                    blanked('P', mode)//mute, &
-                    version, &
-                    xyz, &
-                    alpha_0, &
-                    omega, &
-                    k_point, &
-                    unit_cell, &
-                    R_vdw=R_vdw, &
-                    beta=beta, &
-                    a=a, &
-                    overlap=overlap, &
-                    C6=C6, &
-                    damping_custom=damping_custom, &
-                    potential_custom=potential_custom)
+                                    blanked('P', mode)//mute, &
+                                    version, &
+                                    xyz, &
+                                    alpha_0, &
+                                    omega, &
+                                    k_point, &
+                                    unit_cell, &
+                                    R_vdw=R_vdw, &
+                                    beta=beta, &
+                                    a=a, &
+                                    overlap=overlap, &
+                                    C6=C6, &
+                                    damping_custom=damping_custom, &
+                                    potential_custom=potential_custom)
             end if
         end if
         mute = 'M'
@@ -1403,13 +1439,9 @@ function get_reciprocal_mbd_energy(mode, version, xyz, alpha_0, omega, &
     ! MPI code begin
     if (is_parallel) then
         call sync_sum(ene)
-        if (get_eigenvalues .and. get_eigenvectors) then
-            call sync_sum(mode_enes)
-            call sync_sum(modes)
-        end if
-        if (get_orders) then
-            call sync_sum(rpa_orders)
-        end if
+        if (get_eigenvalues) call sync_sum(mode_enes)
+        if (get_eigenvectors) call sync_sum(modes)
+        if (get_orders) call sync_sum(rpa_orders)
     end if
     ! MPI code end
     ene = ene/size(k_grid, 1)
@@ -1493,8 +1525,8 @@ function get_single_reciprocal_mbd_ene(mode, version, xyz, alpha_0, omega, &
     endif
     ! MPI code begin
     if (is_parallel) then
-        call broadcast(relay)
         call broadcast(eigs)
+        if (get_eigenvectors) call broadcast(relay)
     endif
     ! MPI code end
     call ts(-22)
@@ -2162,13 +2194,13 @@ subroutine diagonalize_he_cmplx_(mode, A, eigs)
     if ( allocated(work) ) deallocate(work)
     selectcase(trim(eigensolver))
         case("qr")        !! QR algorithm: less fast, minimal memory consumption
-            allocate (rwork(max(1, 3*n-2)))
-            allocate(work(1))
+            allocate( rwork(max(1, 3*n-2)) )
+            allocate( work(1) )
             call ZHEEV(mode, "U", n, A, n, eigs, work, -1, rwork, &
                        error_flag)
-            lwork = nint(dble(work(1)))
+            lwork = nint( dble(work(1)) )
             deallocate(work)
-            allocate (work(lwork))
+            allocate( work(lwork) )
             call ZHEEV(mode, "U", n, A, n, eigs, work, lwork, rwork, &
                        error_flag)
         
@@ -2185,9 +2217,9 @@ subroutine diagonalize_he_cmplx_(mode, A, eigs)
             deallocate(work)
             deallocate(rwork)
             deallocate(iwork)
-            allocate (work(lwork))
-            allocate (rwork(lrwork))
-            allocate (iwork(liwork))
+            allocate( work(lwork) )
+            allocate( rwork(lrwork) )
+            allocate( iwork(liwork) )
             call ZHEEVD(mode, "U", n, A, n, eigs, work, lwork, rwork, &
                         lrwork, iwork, liwork, error_flag)
             deallocate(iwork)
