@@ -2561,8 +2561,6 @@ subroutine add_dipole_matrix_s(mode, version, xyz, row2glob, col2glob, &
         endif
         do i_local = 1, size(row2glob)
             i_atom = row2glob(i_local)
-            !$omp parallel do private(r, r_norm, R_vdw_ij, sigma_ij, &
-            !$omp                     C6_ij, Tpp, i, j, Tpp_c)
             do j_local = 1, size(col2glob)
                 j_atom = col2glob(j_local)
                 if ( (i_cell==1) .and. (i_atom==j_atom) ) cycle
@@ -2630,7 +2628,6 @@ subroutine add_dipole_matrix_s(mode, version, xyz, row2glob, col2glob, &
                         + Tpp
                 endif
             enddo ! j_local
-            !$omp end parallel do
         enddo ! i_local
     enddo ! i_cell
     call ts(-11)
