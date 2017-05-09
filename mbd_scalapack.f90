@@ -15,6 +15,7 @@ use mbd_interface, only: &
     sync_sum, broadcast, print_error, print_warning, print_log, pi
 use mbd_helper, only: &
     is_in, blanked
+use ifport
 
 implicit none
 
@@ -369,8 +370,6 @@ subroutine add_dipole_matrix(mode, version, xyz, alpha, R_vdw, beta, a, &
                 if (my_task /= modulo(i_atom, n_tasks)) cycle
             end if
             ! MPI code end
-            !$omp parallel do private(r, r_norm, R_vdw_ij, sigma_ij, overlap_ij, C6_ij, &
-            !$omp    Tpp, i, j, Tpp_c)
             do j_atom = 1, i_atom
                 if (i_cell == 1) then
                     if (i_atom == j_atom) cycle
@@ -463,7 +462,6 @@ subroutine add_dipole_matrix(mode, version, xyz, alpha, R_vdw, beta, a, &
                     end if
                 end if
             end do ! j_atom
-            !$omp end parallel do
         end do ! i_atom
     end do ! i_cell
     call ts(-11)
@@ -985,7 +983,7 @@ function get_mbd_energy(mode, version, xyz, alpha_0, omega, &
                 if ( allocated(eigmodes) ) deallocate(eigmodes)
                 allocate( eigmodes(3*size(xyz, 1), 3*size(xyz, 1)) )
             endif
-            ene = get_single_mbd_energy(blanked('R', mode), &
+            ene = get_single_mbd_energy(mode, &
                                     version, &
                                     xyz, &
                                     alpha_0, &
@@ -1003,7 +1001,7 @@ function get_mbd_energy(mode, version, xyz, alpha_0, omega, &
             
             if ( is_in('E', mode) ) then
                 call write_eigenenergies(mode_eigs(1,:), &
-                                         "mbd_eigenvalues.out")
+                                         "mbd_eigenenergies.out")
                 deallocate(mode_eigs)
             endif
             if ( is_in('V', mode) ) then
@@ -1051,7 +1049,7 @@ function get_mbd_energy(mode, version, xyz, alpha_0, omega, &
             if ( is_in('E', mode) ) then
                 do i_kpt = 1, size(k_grid, 1)
                     call write_eigenenergies(mode_eigs(i_kpt,:), &
-                               "mbd_eigenvalues_reciprocal.out", &
+                               "mbd_eigenenergies_reciprocal.out", &
                                          k_point=k_grid(i_kpt, :))
                 enddo
                 deallocate(mode_eigs)
@@ -1222,6 +1220,7 @@ function get_single_mbd_energy(mode, version, xyz, alpha_0, omega, R_vdw, &
         potential_custom=potential_custom, &
         unit_cell=unit_cell, &
         relay=relay)
+    
     do i_atom = 1, size(xyz, 1)
         do j_atom = 1, size(xyz, 1)
             i = 3*i_atom-2
@@ -1250,7 +1249,8 @@ function get_single_mbd_energy(mode, version, xyz, alpha_0, omega, R_vdw, &
     end if
     ! MPI code begin
     if (is_parallel) then
-        call broadcast(relay)
+!        call broadcast(relay)
+        if (get_eigenvectors) broadcast(modes)
         call broadcast(eigs)
     end if
     ! MPI code end
@@ -1526,7 +1526,8 @@ function get_single_reciprocal_mbd_ene(mode, version, xyz, alpha_0, omega, &
     ! MPI code begin
     if (is_parallel) then
         call broadcast(eigs)
-        if (get_eigenvectors) call broadcast(relay)
+!        call broadcast(relay)
+        if (get_eigenvectors) broadcast(modes)
     endif
     ! MPI code end
     call ts(-22)
@@ -3658,10 +3659,6 @@ function get_single_mbd_energy_s(mode, version, xyz, alpha_0, omega, &
     deallocate(my_relay, stat=ierr)
     call ts(-21)
     
-    if ( (get_eigenvalues) .and. (io_proc) ) then
-        call write_eigenenergies(eigs, "mbd_eigenvalues.out")
-    endif
-    
     n_negative_eigs = count(eigs(:) < 0)
     if (n_negative_eigs > 0) then
         call print_warning( &
@@ -3672,6 +3669,12 @@ function get_single_mbd_energy_s(mode, version, xyz, alpha_0, omega, &
     endif
     
     ene = 1.d0/2*sum(sqrt(eigs))-3.d0/2*sum(omega)
+    
+    if (get_eigenvalues) then
+        where (eigs < 0) eigs = 0.d0
+        eigs = sqrt(eigs)
+        if (io_proc) call write_eigenenergies(eigs, "mbd_eigenenergies.out")
+    endif
     
     ! destroy blacs grid, restore n_tasks
     call BLACS_GRIDEXIT(cfdm_ctxt)
@@ -4110,23 +4113,6 @@ function get_single_reciprocal_mbd_ene_s(mode, version, xyz, alpha_0, &
     deallocate(my_relay, stat=ierr)
     call ts(-22)
     
-    !! write eigenvalues to output file
-    if ( (get_eigenvalues) .and. (io_proc) ) then
-        !! remove old outputfile of eigenenergies
-        if (kptID == 1) then 
-            inquire(file='mbd_eigenvalues_reciprocal.out', exist=fexists)
-            if ( fexists ) then
-                i = get_FileID()
-                open(file="mbd_eigenvalues_reciprocal.out", unit=i, &
-                     status='old')
-                close(i, status='delete')
-            endif
-        endif
-        
-        call write_eigenenergies(eigs, "mbd_eigenvalues_reciprocal.out", &
-                                 k_point=k_point)
-    endif
-    
     n_negative_eigs = count(eigs(:) < 0)
     if (n_negative_eigs > 0) then
         call print_warning( &
@@ -4137,6 +4123,28 @@ function get_single_reciprocal_mbd_ene_s(mode, version, xyz, alpha_0, &
     endif
     
     ene = 1.d0/2*sum(sqrt(eigs))-3.d0/2*sum(omega)
+    
+    !! write eigenvalues to output file
+    if (get_eigenvalues) then
+        where (eigs < 0) eigs = 0.d0
+        eigs = sqrt(eigs)
+        if (io_proc) then
+            !! remove old outputfile of eigenenergies
+            if (kptID == 1) then
+                inquire(file='mbd_eigenenergies_reciprocal.out', exist=fexists)
+                if ( fexists ) then
+                    i = get_FileID()
+                    open(file="mbd_eigenenergies_reciprocal.out", unit=i, &
+                         status='old')
+                    close(i, status='delete')
+                endif
+            endif
+            
+            call write_eigenenergies(eigs, &
+                                   "mbd_eigenenergies_reciprocal.out", &
+                                   k_point=k_point)
+        endif
+    endif
     
     ! destroy blacs grid, restore n_tasks
     call BLACS_GRIDEXIT(cfdm_ctxt)
@@ -4178,8 +4186,8 @@ function map_local2global(idx_local, npX, blocksize, my_pX, pX_start) &
 end function map_local2global
 
 
-subroutine write_eigenenergies(tensor_evals, evals_fname, k_point)
-    real(8), intent(in)            :: tensor_evals(:)
+subroutine write_eigenenergies(eigenes, evals_fname, k_point)
+    real(8), intent(in)            :: eigenes(:)
     character(len=*), intent(in)   :: evals_fname
     
     real(8), intent(in), optional  :: k_point(3)
@@ -4197,12 +4205,8 @@ subroutine write_eigenenergies(tensor_evals, evals_fname, k_point)
     
     if (present(k_point)) write(fid_evals, "(A10,3F10.6)") "k point = ",&
                                       &k_point(1), k_point(2), k_point(3)
-    do i_eval=1, size(tensor_evals)
-        if (tensor_evals(i_eval) > 0.d0) then
-            write(fid_evals, *) sqrt(tensor_evals(i_eval))
-        else
-            write(fid_evals, *) 0.d0
-        endif
+    do i_eval=1, size(eigenes)
+        write(fid_evals, *) eigenes(i_eval)
     enddo
     if ( present(k_point) ) write(fid_evals, *) ""
     close(fid_evals)
