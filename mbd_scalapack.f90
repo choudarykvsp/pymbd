@@ -1250,7 +1250,7 @@ function get_single_mbd_energy(mode, version, xyz, alpha_0, omega, R_vdw, &
     ! MPI code begin
     if (is_parallel) then
 !        call broadcast(relay)
-        if (get_eigenvectors) broadcast(modes)
+        if (get_eigenvectors) call broadcast(modes)
         call broadcast(eigs)
     end if
     ! MPI code end
@@ -1527,7 +1527,7 @@ function get_single_reciprocal_mbd_ene(mode, version, xyz, alpha_0, omega, &
     if (is_parallel) then
         call broadcast(eigs)
 !        call broadcast(relay)
-        if (get_eigenvectors) broadcast(modes)
+        if (get_eigenvectors) call broadcast(modes)
     endif
     ! MPI code end
     call ts(-22)
@@ -4614,7 +4614,7 @@ subroutine ZWRITEEIGVEC(eigenvectors, filenam, kpoint)
     if ( present(kpoint) ) write( fID ) kpoint
     do i=1, n
         do j=1, n
-            write( fID ) eigenvectors(i, j)
+            write( fID ) eigenvectors(j, i)
         enddo
     enddo
     close( fID )
@@ -4635,7 +4635,7 @@ subroutine DWRITEEIGVEC(eigenvectors, filenam)
     write( fID ) n, n
     do i=1, n
         do j=1,n
-            write( fID ) eigenvectors(i, j)
+            write( fID ) eigenvectors(j, i)
         enddo
     enddo
     close( fID )
