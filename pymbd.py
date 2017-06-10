@@ -16,11 +16,12 @@ try:
     from mbd import mbd
 except ImportError:
     if (myid == 0):
-        sys.stderr.write("module mbd not found, trying mbd_scalapack\n")
-    
-    from mbd_scalapack import mbd_scalapack as mbd
-    if (myid == 0):
-        sys.stderr.write("using mbd_scalapack...\n\n")
+        sys.stdout.write("module mbd not found, trying mbd_scalapack...\n")
+    try:
+        from mbd_scalapack import mbd_scalapack as mbd
+        if (myid == 0): sys.stdout.write("mbd_scalapack found.\n\n")
+    except ImportError:
+        if (myid == 0): sys.stderr.write('No MBD module found, check PYTHONPATH!')
 
 
 mbd.my_task = myid
