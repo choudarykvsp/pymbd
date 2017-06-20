@@ -25,7 +25,7 @@ implicit none
 !!  dispersion model [Tkatchenko, et al. PRL 108, 236402 (2012)]      !!
 !!  Including vdW(TS) [Tkatchenko, Scheffler PRL 102, 073005 (2009)]  !!
 !!  and some advanced additional capabilities for development         !!
-!!  based on code by J. Hermann (FHI) ammended by M. Stoehr (UNI.lu)  !!
+!!  based on code by J. Hermann (FHI) ammended by M. Stoehr (UL)      !!
 !!                                                                    !!
 !!  The code is structured as follows:                                !!
 !!  . vdW(TS) energy                                                  !!
