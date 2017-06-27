@@ -1937,8 +1937,10 @@ function eval_mbd_int_density_io(gridpts, xyz, charges, masses, evals, &
                 factor(size(xyz, 1)), &
                 rdiffsq(3, 3), &
                 kernel(3, 3, size(xyz, 1)), &
-                rdiff(3)
-    real(8), allocatable  :: modes(:,:), mm_helper(:,:), omegas_p(:,:)
+                rdiff(3), om_3_3(3,3)
+    
+    real(8), allocatable  :: modes(:,:), mm_helper(:,:), omegas_p(:,:), &
+                             om_oo_inv(:,:), om_helper(:,:)
     
     
     n_atoms = size(xyz, 1)
@@ -1964,21 +1966,36 @@ function eval_mbd_int_density_io(gridpts, xyz, charges, masses, evals, &
     
     kernel(:, :, :) = 0.d0
     pre(:) = 0.d0
+    allocate( om_oo_inv(3*(n_atoms-1), 3*(n_atoms-1)) )
+    allocate( om_helper(3, 3*(n_atoms-1)) )
     do i_atom=1, n_atoms
         if (my_task /= modulo(i_atom, n_tasks)) cycle
         self(:) = (/ (3*(i_atom-1)+i, i = 1, 3) /)
         other(:) = (/ (i, i = 1, 3*(i_atom-1)), &
                       (i, i = 3*i_atom+1, 3*n_atoms) /)
+        om_oo_inv = inverted(omegas_p(other,other))
+        call DGEMM('N', 'N', 3, 3*(n_atoms-1), 3*(n_atoms-1), 1.d0, &
+                   omegas_p(self,other), 3, om_oo_inv, 3*(n_atoms-1), &
+                   0.d0, om_helper, 3)
+        call DGEMM('N', 'N', 3, 3, 3*(n_atoms-1), 1.d0, om_helper, 3, &
+                   omegas_p(other,self), 3*(n_atoms-1), 0.d0, &
+                   om_3_3, 3)
+        
         kernel(:, :, i_atom) = masses(i_atom)*&
-                               ( omegas_p(self, self) - &
-                       matmul(matmul(omegas_p(self, other), &
-                       inverted(omegas_p(other,other))), &
-                       omegas_p(other, self)))
+                               ( omegas_p(self, self) - om_3_3 )
+!        kernel(:, :, i_atom) = masses(i_atom)*&
+!                               ( omegas_p(self, self) - &
+!                       matmul(matmul(omegas_p(self, other), &
+!                       inverted(omegas_p(other,other))), &
+!                       omegas_p(other, self)))
+        
         pre(i_atom) = charges(i_atom)*(masses(i_atom)/pi)**(3.d0/2)*&
                       sqrt(product(evals)/&
                       product(sdiagonalized(omegas_p(other,other))))
     enddo
     deallocate( omegas_p )
+    deallocate( om_oo_inv )
+    deallocate( om_helper )
     call sync_sum(kernel)
     call sync_sum(pre)
     rho(:) = 0.d0
@@ -1994,6 +2011,109 @@ function eval_mbd_int_density_io(gridpts, xyz, charges, masses, evals, &
         rho(i_pt) = sum(pre*exp(-factor))
     enddo
     call sync_sum(rho)
+end function
+
+
+function eval_mbd_density_difference_io(gridpts, xyz, charges, masses, &
+                                        evals, omegas0, fname_modes) &
+                                        result(drho)
+    real(8),          intent(in)  :: gridpts(:, :), &
+                                     xyz(:, :), &
+                                     charges(size(xyz, 1)), &
+                                     masses(size(xyz, 1)), &
+                                     evals(3*size(xyz, 1)), &
+                                     omegas0(size(xyz, 1))
+    character(len=*), intent(in)  :: fname_modes
+    
+    real(8)  :: drho(size(gridpts, 1))
+    
+    integer  :: i_pt, i_atom, n_atoms, i, i_xyz, j_xyz
+    integer  :: self(3), other(3*(size(xyz, 1)-1))
+    real(8)  :: pre(size(xyz, 1)), &
+                factor(size(xyz, 1)), &
+                rdiffsq(3, 3), &
+                kernel(3, 3, size(xyz, 1)), &
+                rdiff(3), om_3_3(3,3), rho_ni_ipt
+    
+    real(8), allocatable  :: modes(:,:), mm_helper(:,:), omegas_p(:,:), &
+                             om_oo_inv(:,:), om_helper(:,:), pre_ni(:), &
+                             kernel_ni(:), rsq(:)
+    
+    
+    n_atoms = size(xyz, 1)
+    allocate( modes(3*n_atoms, 3*n_atoms) )
+    call read_mbd_modes(modes, fname_modes)
+    allocate( mm_helper(3*n_atoms, 3*n_atoms) )
+    mm_helper(:,:) = 0.d0
+    do i_atom=1, 3*n_atoms
+        if (my_task /= modulo(i_atom, n_tasks)) cycle
+        mm_helper(:,i_atom) = sqrt(evals(i_atom))*modes(:,i_atom)
+    enddo
+    deallocate( modes )
+    call sync_sum(mm_helper)
+    allocate( omegas_p(3*n_atoms, 3*n_atoms) )
+    if ( (.not. n_tasks>1) .or. (my_task == 0) ) then
+        call DGEMM('N', 'T', 3*n_atoms, 3*n_atoms, 3*n_atoms, 1.d0, &
+                   mm_helper, 3*n_atoms, mm_helper, 3*n_atoms, 0.d0, &
+                   omegas_p, 3*n_atoms)
+    endif
+    deallocate( mm_helper )
+    if (n_tasks > 1) call broadcast(omegas_p)
+    kernel(:, :, :) = 0.d0
+    pre(:) = 0.d0
+    allocate( om_oo_inv(3*(n_atoms-1), 3*(n_atoms-1)) )
+    allocate( om_helper(3, 3*(n_atoms-1)) )
+    do i_atom=1, n_atoms
+        if (my_task /= modulo(i_atom, n_tasks)) cycle
+        self(:) = (/ (3*(i_atom-1)+i, i = 1, 3) /)
+        other(:) = (/ (i, i = 1, 3*(i_atom-1)), &
+                      (i, i = 3*i_atom+1, 3*n_atoms) /)
+        om_oo_inv = inverted(omegas_p(other,other))
+        call DGEMM('N', 'N', 3, 3*(n_atoms-1), 3*(n_atoms-1), 1.d0, &
+                   omegas_p(self,other), 3, om_oo_inv, 3*(n_atoms-1), &
+                   0.d0, om_helper, 3)
+        call DGEMM('N', 'N', 3, 3, 3*(n_atoms-1), 1.d0, om_helper, 3, &
+                   omegas_p(other,self), 3*(n_atoms-1), 0.d0, &
+                   om_3_3, 3)
+        
+        kernel(:, :, i_atom) = masses(i_atom)*&
+                               ( omegas_p(self, self) - om_3_3 )
+        
+        pre(i_atom) = charges(i_atom)*(masses(i_atom)/pi)**(3.d0/2)*&
+                      sqrt(product(evals)/&
+                      product(sdiagonalized(omegas_p(other,other))))
+    enddo
+    deallocate( omegas_p )
+    deallocate( om_oo_inv )
+    deallocate( om_helper )
+    call sync_sum(kernel)
+    call sync_sum(pre)
+    
+    allocate( pre_ni(n_atoms) )
+    allocate( kernel_ni(n_atoms) )
+    allocate( rsq(n_atoms) )
+    pre_ni = charges*(masses*omegas0/pi)**(3.d0/2)
+    kernel_ni = masses*omegas0
+    
+    drho(:) = 0.d0
+    do i_pt=1, size(gridpts, 1)
+        if (my_task /= modulo(i_pt, n_tasks)) cycle
+        do i_atom=1, n_atoms
+            rdiff(:) = gridpts(i_pt, :)-xyz(i_atom, :)
+            forall (i_xyz = 1:3, j_xyz = 1:3)
+                rdiffsq(i_xyz, j_xyz) = rdiff(i_xyz)*rdiff(j_xyz)
+            end forall
+            factor(i_atom) = sum(kernel(:, :, i_atom)*rdiffsq(:, :))
+            rsq(i_atom) = sum(rdiff*rdiff)
+        enddo
+        rho_ni_ipt = sum(pre_ni*exp(-kernel_ni*rsq))
+        drho(i_pt) = sum(pre*exp(-factor)) - rho_ni_ipt
+    enddo
+    call sync_sum(drho)
+    deallocate( rsq )
+    deallocate( kernel_ni )
+    deallocate( pre_ni )
+
 end function
 
 
