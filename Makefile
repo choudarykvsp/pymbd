@@ -2,7 +2,7 @@ FVENDOR = intelem #gnu95
 CVENDOR = intelem #unix
 FC = mpiifort
 LDFLAGS = --link-lapack_opt
-FFLAGS = -O3 #-fcheck=all
+FFLAGS = -O3 #-check all
 F2PY = f2py
 BLDDIR = build
 #AR = ar

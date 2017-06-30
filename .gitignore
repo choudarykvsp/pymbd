@@ -6,3 +6,5 @@
 /*.dSYM
 /system.mk
 *.pyc
+reinstall.log
+install.log

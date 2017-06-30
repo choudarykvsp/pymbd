@@ -1840,7 +1840,8 @@ end function get_single_reciprocal_rpa_ene
 ! end function mbd_nbody
 
 
-function eval_mbd_nonint_density(pts, xyz, charges, masses, omegas) result(rho)
+function eval_mbd_nonint_density(pts, xyz, charges, masses, omegas) &
+                                 result(rho)
     real(8), intent(in) :: &
         pts(:, :), &
         xyz(:, :), &
@@ -1867,7 +1868,8 @@ function eval_mbd_nonint_density(pts, xyz, charges, masses, omegas) result(rho)
 end function
 
 
-function eval_mbd_int_density(pts, xyz, charges, masses, omegas, modes) result(rho)
+function eval_mbd_int_density(pts, xyz, charges, masses, omegas, modes) &
+                              result(rho)
     real(8), intent(in) :: &
         pts(:, :), &
         xyz(:, :), &
@@ -1920,13 +1922,14 @@ function eval_mbd_int_density(pts, xyz, charges, masses, omegas, modes) result(r
 end function
 
 
-function eval_mbd_int_density_io(gridpts, xyz, charges, masses, evals, &
-                                 fname_modes) result(rho)
+function eval_mbd_int_density_io(gridpts, xyz, charges, masses, &
+                                 omega_int, fname_modes) &
+                                 result(rho)
     real(8),          intent(in)  :: gridpts(:, :), &
                                      xyz(:, :), &
                                      charges(size(xyz, 1)), &
                                      masses(size(xyz, 1)), &
-                                     evals(3*size(xyz, 1))
+                                     omega_int(3*size(xyz, 1))
     character(len=*), intent(in)  :: fname_modes
     
     real(8)  :: rho(size(gridpts, 1))
@@ -1935,22 +1938,25 @@ function eval_mbd_int_density_io(gridpts, xyz, charges, masses, evals, &
     integer  :: self(3), other(3*(size(xyz, 1)-1))
     real(8)  :: pre(size(xyz, 1)), &
                 factor(size(xyz, 1)), &
-                rdiffsq(3, 3), &
+                rdiffsq(3,3), &
                 kernel(3, 3, size(xyz, 1)), &
-                rdiff(3), om_3_3(3,3)
-    
+                rdiff(3), om_3_3(3,3), &
+                evals_oo(3*(size(xyz, 1)-1)), &
+                om_ss(3,3)
+                
     real(8), allocatable  :: modes(:,:), mm_helper(:,:), omegas_p(:,:), &
-                             om_oo_inv(:,:), om_helper(:,:)
-    
-    
-    n_atoms = size(xyz, 1)
+                             om_oo(:,:), om_oo_inv(:,:), om_helper(:,:),&
+                             om_so(:,:)
+                             
+                             
+    n_atoms = size(xyz, 1)   
     allocate( modes(3*n_atoms, 3*n_atoms) )
     call read_mbd_modes(modes, fname_modes)
     allocate( mm_helper(3*n_atoms, 3*n_atoms) )
     mm_helper(:,:) = 0.d0
     do i_atom=1, 3*n_atoms
         if (my_task /= modulo(i_atom, n_tasks)) cycle
-        mm_helper(:,i_atom) = sqrt(evals(i_atom))*modes(:,i_atom)
+        mm_helper(:,i_atom) = sqrt(omega_int(i_atom))*modes(:,i_atom)
     enddo
     deallocate( modes )
     call sync_sum(mm_helper)
@@ -1962,42 +1968,42 @@ function eval_mbd_int_density_io(gridpts, xyz, charges, masses, evals, &
     endif
     deallocate( mm_helper )
     if (n_tasks > 1) call broadcast(omegas_p)
-!    matmul(matmul(modes, diag(evals)), transpose(modes))
-    
     kernel(:, :, :) = 0.d0
     pre(:) = 0.d0
     allocate( om_oo_inv(3*(n_atoms-1), 3*(n_atoms-1)) )
     allocate( om_helper(3, 3*(n_atoms-1)) )
+    allocate( om_oo(3*(n_atoms-1), 3*(n_atoms-1)) )
+    allocate( om_so(3, 3*(n_atoms-1)) )
     do i_atom=1, n_atoms
         if (my_task /= modulo(i_atom, n_tasks)) cycle
         self(:) = (/ (3*(i_atom-1)+i, i = 1, 3) /)
         other(:) = (/ (i, i = 1, 3*(i_atom-1)), &
                       (i, i = 3*i_atom+1, 3*n_atoms) /)
-        om_oo_inv = inverted(omegas_p(other,other))
+        om_oo = omegas_p(other,other)
+        om_so = omegas_p(self, other)
+        om_ss = omegas_p(self, self)
+        om_oo_inv = inverted(om_oo)
         call DGEMM('N', 'N', 3, 3*(n_atoms-1), 3*(n_atoms-1), 1.d0, &
-                   omegas_p(self,other), 3, om_oo_inv, 3*(n_atoms-1), &
-                   0.d0, om_helper, 3)
+                  om_so, 3, om_oo_inv, 3*(n_atoms-1), 0.d0, om_helper, 3)
+        om_so = omegas_p(other, self)
         call DGEMM('N', 'N', 3, 3, 3*(n_atoms-1), 1.d0, om_helper, 3, &
-                   omegas_p(other,self), 3*(n_atoms-1), 0.d0, &
-                   om_3_3, 3)
+                   om_so, 3*(n_atoms-1), 0.d0, om_3_3, 3)
         
-        kernel(:, :, i_atom) = masses(i_atom)*&
-                               ( omegas_p(self, self) - om_3_3 )
-!        kernel(:, :, i_atom) = masses(i_atom)*&
-!                               ( omegas_p(self, self) - &
-!                       matmul(matmul(omegas_p(self, other), &
-!                       inverted(omegas_p(other,other))), &
-!                       omegas_p(other, self)))
+        kernel(:, :, i_atom) = masses(i_atom)*( om_ss - om_3_3 )
         
+        evals_oo = sdiagonalized(om_oo)
         pre(i_atom) = charges(i_atom)*(masses(i_atom)/pi)**(3.d0/2)*&
-                      sqrt(product(evals)/&
-                      product(sdiagonalized(omegas_p(other,other))))
+                      sqrt(product(omega_int(:3*n_atoms-3)/evals_oo)*&
+                           product(omega_int(3*n_atoms-2:)))
     enddo
     deallocate( omegas_p )
     deallocate( om_oo_inv )
     deallocate( om_helper )
+    deallocate( om_oo )
+    deallocate( om_so )
     call sync_sum(kernel)
     call sync_sum(pre)
+    
     rho(:) = 0.d0
     do i_pt=1, size(gridpts, 1)
         if (my_task /= modulo(i_pt, n_tasks)) cycle
@@ -2011,17 +2017,18 @@ function eval_mbd_int_density_io(gridpts, xyz, charges, masses, evals, &
         rho(i_pt) = sum(pre*exp(-factor))
     enddo
     call sync_sum(rho)
+    
 end function
 
 
-function eval_mbd_density_difference_io(gridpts, xyz, charges, masses, &
-                                        evals, omegas0, fname_modes) &
-                                        result(drho)
+function eval_mbd_drho_int_nonint_io(gridpts, xyz, charges, masses, &
+                                     omega_int, omegas0, fname_modes) &
+                                     result(drho)
     real(8),          intent(in)  :: gridpts(:, :), &
                                      xyz(:, :), &
                                      charges(size(xyz, 1)), &
                                      masses(size(xyz, 1)), &
-                                     evals(3*size(xyz, 1)), &
+                                     omega_int(3*size(xyz, 1)), &
                                      omegas0(size(xyz, 1))
     character(len=*), intent(in)  :: fname_modes
     
@@ -2033,11 +2040,14 @@ function eval_mbd_density_difference_io(gridpts, xyz, charges, masses, &
                 factor(size(xyz, 1)), &
                 rdiffsq(3, 3), &
                 kernel(3, 3, size(xyz, 1)), &
-                rdiff(3), om_3_3(3,3), rho_ni_ipt
+                rdiff(3), om_3_3(3,3), rho_ni_ipt, &
+                evals_oo(3*(size(xyz, 1)-1)), &
+                om_ss(3, 3)
     
     real(8), allocatable  :: modes(:,:), mm_helper(:,:), omegas_p(:,:), &
                              om_oo_inv(:,:), om_helper(:,:), pre_ni(:), &
-                             kernel_ni(:), rsq(:)
+                             kernel_ni(:), rsq(:), om_oo(:,:), &
+                             om_so(:,:), om_os(:,:)
     
     
     n_atoms = size(xyz, 1)
@@ -2047,7 +2057,7 @@ function eval_mbd_density_difference_io(gridpts, xyz, charges, masses, &
     mm_helper(:,:) = 0.d0
     do i_atom=1, 3*n_atoms
         if (my_task /= modulo(i_atom, n_tasks)) cycle
-        mm_helper(:,i_atom) = sqrt(evals(i_atom))*modes(:,i_atom)
+        mm_helper(:,i_atom) = sqrt(omega_int(i_atom))*modes(:,i_atom)
     enddo
     deallocate( modes )
     call sync_sum(mm_helper)
@@ -2063,29 +2073,37 @@ function eval_mbd_density_difference_io(gridpts, xyz, charges, masses, &
     pre(:) = 0.d0
     allocate( om_oo_inv(3*(n_atoms-1), 3*(n_atoms-1)) )
     allocate( om_helper(3, 3*(n_atoms-1)) )
+    allocate( om_oo(3*(n_atoms-1), 3*(n_atoms-1)) )
+    allocate( om_so(3, 3*(n_atoms-1)) )
+    allocate( om_os(3*(n_atoms-1), 3) )
     do i_atom=1, n_atoms
         if (my_task /= modulo(i_atom, n_tasks)) cycle
         self(:) = (/ (3*(i_atom-1)+i, i = 1, 3) /)
         other(:) = (/ (i, i = 1, 3*(i_atom-1)), &
                       (i, i = 3*i_atom+1, 3*n_atoms) /)
-        om_oo_inv = inverted(omegas_p(other,other))
+        om_oo = omegas_p(other,other)
+        om_so = omegas_p(self, other)
+        om_os = omegas_p(other, self)
+        om_ss = omegas_p(self, self)
+        om_oo_inv = inverted(om_oo)
         call DGEMM('N', 'N', 3, 3*(n_atoms-1), 3*(n_atoms-1), 1.d0, &
-                   omegas_p(self,other), 3, om_oo_inv, 3*(n_atoms-1), &
-                   0.d0, om_helper, 3)
+                  om_so, 3, om_oo_inv, 3*(n_atoms-1), 0.d0, om_helper, 3)
         call DGEMM('N', 'N', 3, 3, 3*(n_atoms-1), 1.d0, om_helper, 3, &
-                   omegas_p(other,self), 3*(n_atoms-1), 0.d0, &
-                   om_3_3, 3)
+                   om_so, 3*(n_atoms-1), 0.d0, om_3_3, 3)
         
-        kernel(:, :, i_atom) = masses(i_atom)*&
-                               ( omegas_p(self, self) - om_3_3 )
+        kernel(:, :, i_atom) = masses(i_atom)*( om_ss - om_3_3 )
         
+        evals_oo = sdiagonalized(om_oo)
         pre(i_atom) = charges(i_atom)*(masses(i_atom)/pi)**(3.d0/2)*&
-                      sqrt(product(evals)/&
-                      product(sdiagonalized(omegas_p(other,other))))
+                      sqrt(product(omega_int(:3*n_atoms-3)/evals_oo)*&
+                           product(omega_int(3*n_atoms-2:)))
     enddo
     deallocate( omegas_p )
     deallocate( om_oo_inv )
     deallocate( om_helper )
+    deallocate( om_oo )
+    deallocate( om_so )
+    deallocate( om_os )
     call sync_sum(kernel)
     call sync_sum(pre)
     
@@ -2804,7 +2822,9 @@ subroutine read_mbd_modes(modes, filenam)
     open( file=trim(filenam), unit=fID_V, status='old', &
           form='unformatted' )
     read(fID_V) nModes, buffer_n
-    
+    if (nModes /= size(modes,1)) then
+        call print_error(" Size of eigenmode input file does not match system.")
+    endif
     !! read modes [NOTE: in output format mode i = modes(i,:)]
     do i=1, nModes
         do iMode=1, nModes
@@ -2829,6 +2849,9 @@ subroutine read_mbd_modes_reciprocal(modes, filenam)
     read(fID_V) nModes, buffer_n
     read(fID_V) buffer_k
     
+    if (nModes /= size(modes,1)) then
+        call print_error(" Size of eigenmode input file does not match system.")
+    endif
     !! read modes [NOTE: in output format mode i = modes(i,:)]
     do i=1, nModes
         do iMode=1, nModes
