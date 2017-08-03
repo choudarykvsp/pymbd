@@ -16,7 +16,7 @@ from .vdw_param import vdw_param as free_atom_db
 try:
     from .lib import mbd as _mbd
 except ImportError:
-    from mbd_scalapack import mbd_scalapack as _mbd
+    from mbd import mbd as _mbd
 
 _mbd.my_task = myid
 _mbd.n_tasks = ntasks
