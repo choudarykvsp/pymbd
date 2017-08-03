@@ -1,3 +1,6 @@
+! This Source Code Form is subject to the terms of the Mozilla Public
+! License, v. 2.0. If a copy of the MPL was not distributed with this
+! file, You can obtain one at http://mozilla.org/MPL/2.0/.
 module mbd
 
 ! modes:
@@ -370,6 +373,8 @@ subroutine add_dipole_matrix(mode, version, xyz, alpha, R_vdw, beta, a, &
                 if (my_task /= modulo(i_atom, n_tasks)) cycle
             end if
             ! MPI code end
+            !$omp parallel do private(r, r_norm, R_vdw_ij, sigma_ij, overlap_ij, C6_ij, &
+            !$omp    Tpp, i, j, Tpp_c)
             do j_atom = 1, i_atom
                 if (i_cell == 1) then
                     if (i_atom == j_atom) cycle
@@ -451,7 +456,7 @@ subroutine add_dipole_matrix(mode, version, xyz, alpha, R_vdw, beta, a, &
                                             + Tpp_c
                     if (i_atom /= j_atom) then
                         relay_c(j:j+2, i:i+2) = relay_c(j:j+2, i:i+2) &
-                                                + transpose(Tpp_c)
+                                                + conjg(transpose(Tpp_c))
                     end if
                 else
                     relay(i:i+2, j:j+2) = relay(i:i+2, j:j+2) &
@@ -462,6 +467,7 @@ subroutine add_dipole_matrix(mode, version, xyz, alpha, R_vdw, beta, a, &
                     end if
                 end if
             end do ! j_atom
+            !$omp end parallel do
         end do ! i_atom
     end do ! i_cell
     call ts(-11)
@@ -563,6 +569,7 @@ subroutine add_ewald_dipole_parts(mode, xyz, unit_cell, alpha, &
                 if (my_task /= modulo(i_atom, n_tasks)) cycle
             end if
             ! MPI code end
+            !$omp parallel do private(r, Tpp, i, j, Tpp_c)
             do j_atom = 1, i_atom
                 r = xyz(i_atom, :)-xyz(j_atom, :)
                 if (is_reciprocal) then
@@ -577,7 +584,7 @@ subroutine add_ewald_dipole_parts(mode, xyz, unit_cell, alpha, &
                     relay_c(i:i+2, j:j+2) = relay_c(i:i+2, j:j+2) + Tpp_c
                     if (i_atom /= j_atom) then
                         relay_c(j:j+2, i:i+2) = relay_c(j:j+2, i:i+2) &
-                                                + transpose(Tpp_c)
+                                                + conjg(transpose(Tpp_c))
                     end if
                 else
                     relay(i:i+2, j:j+2) = relay(i:i+2, j:j+2) + Tpp
@@ -587,6 +594,7 @@ subroutine add_ewald_dipole_parts(mode, xyz, unit_cell, alpha, &
                     end if
                 end if
             end do ! j_atom
+            !$omp end parallel do
         end do ! i_atom
     end do ! i_G_vector
     ! MPI code begin
@@ -720,24 +728,6 @@ subroutine gauss_legendre(n, r, w)
     integer :: k, iter, i
     real(q) :: Pk(0:n), Pk1(0:n-1), Pk2(0:n-2)
 
-    select case (legendre_precision)
-    case (8) 
-        if (n > 20) then
-            call print_error( &
-                           'Cannot construct accurate Gauss-Legendre'//&
-                          &' quadrature grids for n > 20.' &
-                            )
-        end if
-    case (16)
-        if (n > 60) then
-            call print_error( &
-                           'Cannot construct accurate Gauss-Legendre'//&
-                          &' quadrature grids for n > 60.' &
-                            )
-        end if
-    case default
-        call print_warning('Gauss-Legendre grids: unknown precision')
-    end select
     if (n == 1) then
         r(1) = 0.d0
         w(1) = 2.d0
@@ -776,6 +766,26 @@ end subroutine gauss_legendre
 subroutine destroy_grid()
     deallocate (omega_grid)
     deallocate (omega_grid_w)
+end subroutine
+
+
+subroutine init_eqi_grid(n, a, b)
+    integer, intent(in) :: n
+    real(8), intent(in) :: a, b
+
+    real(8) :: delta
+    integer :: i
+
+    n_grid_omega = n
+    if (allocated(omega_grid)) deallocate(omega_grid)
+    if (allocated(omega_grid_w)) deallocate(omega_grid_w)
+    allocate (omega_grid(0:n))
+    allocate (omega_grid_w(0:n))
+    omega_grid(0) = 0.d0
+    omega_grid_w(0) = 0.d0
+    delta = (b-a)/n
+    omega_grid(1:n) = (/ (a+delta/2+i*delta, i = 0, n-1) /)
+    omega_grid_w(1:n) = delta
 end subroutine
 
 
@@ -1320,6 +1330,7 @@ function get_reciprocal_mbd_energy(mode, version, xyz, alpha_0, omega, &
     ene = 0.d0
     if (get_eigenvalues) mode_enes(:, :) = 0.d0
     if (get_eigenvectors) modes(:, :, :) = 0.d0
+    if (get_orders) rpa_orders(:, :) = 0.d0
     do i_kpt = 1, size(k_grid, 1)
         ! MPI code begin
         if (is_parallel) then
@@ -1445,6 +1456,7 @@ function get_reciprocal_mbd_energy(mode, version, xyz, alpha_0, omega, &
     end if
     ! MPI code end
     ene = ene/size(k_grid, 1)
+    if (get_orders) rpa_orders = rpa_orders/size(k_grid, 1)
 end function get_reciprocal_mbd_energy
 
 
@@ -1686,14 +1698,16 @@ function get_single_reciprocal_rpa_ene(mode, version, xyz, alpha, k_point, &
     else
         mute = ''
     end if
-    
+
+    ene = 0.d0
+    if (get_orders) rpa_orders(:) = 0.d0
     do i_grid_omega = 0, n_grid_omega
         ! MPI code begin
         if (is_parallel) then
             if (my_task /= modulo(i_grid_omega, n_tasks)) cycle
         end if
         ! MPI code end
-        relay(:, :) = 0.d0
+        relay(:, :) = cmplx(0.d0, 0.d0, 8)
         call add_dipole_matrix( & ! relay = T
             blanked('P', mode)//mute, &
             version, &
@@ -1720,7 +1734,6 @@ function get_single_reciprocal_rpa_ene(mode, version, xyz, alpha, k_point, &
         do i = 1, 3*size(xyz, 1)
             relay(i, i) = 1.d0+relay(i, i) ! relay = 1+alpha*T
         end do
-        relay = sqrt(relay*conjg(relay))
         call ts(25)
         call diagonalize('N', relay, eigs)
         call ts(-25)
@@ -1734,16 +1747,15 @@ function get_single_reciprocal_rpa_ene(mode, version, xyz, alpha, k_point, &
             call print_warning("1+AT matrix has " &
                 //trim(tostr(n_negative_eigs))//" negative eigenvalues")
         end if
-        ene = ene+1.d0/(2*pi)*sum(log(dble(eigs)))*omega_grid_w(i_grid_omega)
+        ene = ene+1.d0/(2*pi)*dble(sum(log(eigs)))*omega_grid_w(i_grid_omega)
         if (get_orders) then
-            AT = 2*dble(AT)+AT*conjg(AT)
             call ts(26)
             call diagonalize('N', AT, eigs)
             call ts(-26)
             do n_order = 2, param_rpa_order_max
                 rpa_orders(n_order) = rpa_orders(n_order) &
-                    +(-1.d0/(2*pi)*(-1)**n_order &
-                    *sum(dble(eigs)**n_order)/n_order) &
+                    +(-1.d0)/(2*pi)*(-1)**n_order &
+                    *dble(sum(eigs**n_order))/n_order &
                     *omega_grid_w(i_grid_omega)
             end do
         end if
