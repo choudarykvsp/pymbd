@@ -59,13 +59,9 @@ implicit none
 !!                                                                    !!
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
+real(8), parameter :: bohr = 0.529177249d0
 
-
-
-
-real(8), parameter  :: bohr = 0.529177249d0
-
-real(8)  :: &
+real(8) :: &
     param_ts_energy_accuracy = 1.d-10, &
     param_ts_cutoff_radius = 50.d0/bohr, &
     param_dipole_low_dim_cutoff = 100.d0/bohr, &
@@ -74,29 +70,29 @@ real(8)  :: &
     param_ewald_real_cutoff_scaling = 1.d0, &
     param_ewald_rec_cutoff_scaling = 1.d0, &
     param_k_grid_shift = 0.5d0
-logical  :: &
+logical :: &
     param_ewald_on = .true., &
     param_zero_negative_eigs = .false.
-integer  :: &
+integer :: &
     param_mbd_nbody_max = 3, &
     param_rpa_order_max = 10
-logical  :: &
+logical :: &
     param_vacuum_axis(3) = (/ .false., .false., .false. /)
 
-integer               :: n_grid_omega
-real(8), allocatable  :: omega_grid(:), omega_grid_w(:)
+integer :: n_grid_omega
+real(8), allocatable :: omega_grid(:), omega_grid_w(:)
 
-integer, parameter  :: n_timestamps = 100
-logical             :: measure_time = .true.
-integer             :: timestamps(n_timestamps), ts_counts(n_timestamps)
-integer             :: ts_cnt, ts_rate, ts_cnt_max, ts_aid
+integer, parameter :: n_timestamps = 100
+logical :: measure_time = .true.
+integer :: timestamps(n_timestamps), ts_counts(n_timestamps)
+integer :: ts_cnt, ts_rate, ts_cnt_max, ts_aid
 
-integer  :: my_task, n_tasks
+integer :: my_task, n_tasks
 
-integer, parameter  :: minFileID = 20
-integer, parameter  :: maxFileID = 65535
+integer, parameter :: minFileID = 20
+integer, parameter :: maxFileID = 65535
 
-character(len=5)  :: eigensolver = "qr   "
+character(len=5) :: eigensolver = 'qr   '
 
 interface operator(.cprod.)
     module procedure cart_prod_
@@ -137,18 +133,14 @@ interface tostr
 end interface
 
 ! external :: ZHEEV, DGEEV, DSYEV, DGETRF, DGETRI, DGESV, ZGETRF, &
-!             ZGETRI, ZGEEV, ZGEEB, BLACS_BARRIER, BLACS_GRIDINFO, &
-!             INFOG2L, DGERV2D, DGESD2D, ICEIL, PDGETRI, PDSYEV, &
-!             numroc, PZHEEV, BLACS_PINFO, BLACS_GET, BLACS_GRIDINIT, &
-!             descinit, PDGETRF, DGSUM2D, BLACS_GRIDEXIT, pdelget, &
-!             PDSYEVD, PZHEEVD, PDSYEVR, PZHEEVR, DSYEVD, ZHEEVD, &
-!             DSYEVR, ZHEEVR, DGEMM
+!     ZGETRI, ZGEEV, ZGEEB, BLACS_BARRIER, BLACS_GRIDINFO, &
+!     INFOG2L, DGERV2D, DGESD2D, ICEIL, PDGETRI, PDSYEV, &
+!     numroc, PZHEEV, BLACS_PINFO, BLACS_GET, BLACS_GRIDINIT, &
+!     descinit, PDGETRF, DGSUM2D, BLACS_GRIDEXIT, pdelget, &
+!     PDSYEVD, PZHEEVD, PDSYEVR, PZHEEVR, DSYEVD, ZHEEVD, &
+!     DSYEVR, ZHEEVR, DGEMM
 
 contains
-
-
-
-
 
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !!     vdW(TS) ENERGY     !!
@@ -270,10 +262,6 @@ function get_ts_energy( mode, version, xyz, C6, alpha_0, R_vdw, s_R, &
     end do ! i_shell
 end function get_ts_energy
 
-
-
-
-
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !!     DIPOLE INTERACTION TENSOR (LAPACK/MPI)     !!
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -348,7 +336,7 @@ subroutine add_dipole_matrix(mode, version, xyz, alpha, R_vdw, beta, a, &
         range_cell = (/ 0, 0, 0 /)
     end if
     if (is_crystal) then
-        call print_log('Ewald: summing real part in cell vector range of '&
+        call print_log('Ewald: summing real part in cell vector range of ' &
             //trim(tostr(1+2*range_cell(1)))//'x' &
             //trim(tostr(1+2*range_cell(2)))//'x' &
             //trim(tostr(1+2*range_cell(3))), mute)
@@ -430,7 +418,7 @@ subroutine add_dipole_matrix(mode, version, xyz, alpha, R_vdw, beta, a, &
                             *T_erf_coulomb(r, sigma_ij, 1.d0)
                         do_ewald = .false.
                     case ("erf,dip,gg")
-                        Tpp = (1.d0-damping_erf(r_norm, beta*R_vdw_ij, a)) & 
+                        Tpp = (1.d0-damping_erf(r_norm, beta*R_vdw_ij, a)) &
                             *T_erf_coulomb(r, sigma_ij, 1.d0)
                         do_ewald = .false.
                     case ("fermi,dip,gg")
@@ -447,23 +435,23 @@ subroutine add_dipole_matrix(mode, version, xyz, alpha, R_vdw, beta, a, &
                 end if
                 if (is_reciprocal) then
                     Tpp_c = Tpp*exp(-cmplx(0.d0, 1.d0, 8)*( &
-                                    dot_product(k_point, r)))
+                        dot_product(k_point, r)))
                 end if
                 i = 3*i_atom-2
                 j = 3*j_atom-2
                 if (is_reciprocal) then
                     relay_c(i:i+2, j:j+2) = relay_c(i:i+2, j:j+2) &
-                                            + Tpp_c
+                        + Tpp_c
                     if (i_atom /= j_atom) then
                         relay_c(j:j+2, i:i+2) = relay_c(j:j+2, i:i+2) &
-                                                + conjg(transpose(Tpp_c))
+                            + conjg(transpose(Tpp_c))
                     end if
                 else
                     relay(i:i+2, j:j+2) = relay(i:i+2, j:j+2) &
-                                          + Tpp
+                        + Tpp
                     if (i_atom /= j_atom) then
                         relay(j:j+2, i:i+2) = relay(j:j+2, i:i+2) &
-                                              + transpose(Tpp)
+                            + transpose(Tpp)
                     end if
                 end if
             end do ! j_atom
@@ -499,7 +487,7 @@ subroutine add_ewald_dipole_parts(mode, xyz, unit_cell, alpha, &
     real(8), intent(inout), optional :: relay(3*size(xyz, 1), 3*size(xyz, 1))
     complex(8), intent(inout), optional :: &
         relay_c(3*size(xyz, 1), 3*size(xyz, 1))
-    
+
     logical :: is_parallel, is_reciprocal, mute, do_surface
     real(8) :: rec_unit_cell(3, 3), volume, G_vector(3), r(3), k_total(3), &
         k_sq, rec_space_cutoff, Tpp(3, 3), k_prefactor(3, 3), elem
@@ -508,7 +496,7 @@ subroutine add_ewald_dipole_parts(mode, xyz, unit_cell, alpha, &
         i_atom, j_atom, i, j, i_xyz, j_xyz, idx_G_vector(3), i_G_vector, &
         range_G_vector(3)
     character(len=1) :: parallel_mode
-    
+
     is_parallel = is_in('P', mode)
     is_reciprocal = is_in('R', mode)
     mute = is_in('M', mode)
@@ -520,7 +508,7 @@ subroutine add_ewald_dipole_parts(mode, xyz, unit_cell, alpha, &
     else
         parallel_mode = ''
     end if
-    
+
     ! MPI code begin
     if (is_parallel) then
         ! will be restored by syncing at the end
@@ -584,13 +572,13 @@ subroutine add_ewald_dipole_parts(mode, xyz, unit_cell, alpha, &
                     relay_c(i:i+2, j:j+2) = relay_c(i:i+2, j:j+2) + Tpp_c
                     if (i_atom /= j_atom) then
                         relay_c(j:j+2, i:i+2) = relay_c(j:j+2, i:i+2) &
-                                                + conjg(transpose(Tpp_c))
+                            + conjg(transpose(Tpp_c))
                     end if
                 else
                     relay(i:i+2, j:j+2) = relay(i:i+2, j:j+2) + Tpp
                     if (i_atom /= j_atom) then
                         relay(j:j+2, i:i+2) = relay(j:j+2, i:i+2) &
-                                              + transpose(Tpp)
+                            + transpose(Tpp)
                     end if
                 end if
             end do ! j_atom
@@ -664,10 +652,7 @@ subroutine add_ewald_dipole_parts(mode, xyz, unit_cell, alpha, &
         end do ! i_atom
     end if
     call ts(-12)
-end subroutine add_ewald_dipole_parts
-
-
-
+end subroutine
 
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !!     SELF-CONSISTENT SCREENING (LAPACK/MPI)     !!
@@ -675,7 +660,7 @@ end subroutine add_ewald_dipole_parts
 
 subroutine init_grid(n)
     integer, intent(in) :: n
-    
+
     n_grid_omega = n
     if (allocated(omega_grid)) deallocate(omega_grid)
     if (allocated(omega_grid_w)) deallocate(omega_grid_w)
@@ -685,20 +670,19 @@ subroutine init_grid(n)
     omega_grid_w(0) = 0.d0
     call get_omega_grid(n, 0.6d0, omega_grid(1:n), omega_grid_w(1:n))
     call print_log( &
-                    &"Initialized a radial integration grid of "//&
-                    &trim(tostr(n))//" points." &
-                   )
+        "Initialized a radial integration grid of "//trim(tostr(n))//" points." &
+    )
     call print_log( &
-                    &"Relative quadrature error in C6 of carbon atom: "//&
-                    &trim(tostr(test_frequency_grid())) &
-                   )
+        "Relative quadrature error in C6 of carbon atom: "// &
+        trim(tostr(test_frequency_grid())) &
+    )
 end subroutine
 
 
 real(8) function test_frequency_grid() result(error)
     real(8) :: alpha(0:n_grid_omega, 1)
-    
-    alpha = alpha_dynamic_ts_all('C', n_grid_omega, (/21.d0/), C6=(/99.5d0/))
+
+    alpha = alpha_dynamic_ts_all('C', n_grid_omega, (/ 21.d0 /), C6=(/ 99.5d0 /))
     error = abs(get_total_C6_from_alpha(alpha)/99.5d0-1.d0)
 end function
 
@@ -718,10 +702,10 @@ end subroutine get_omega_grid
 
 subroutine gauss_legendre(n, r, w)
     use mbd_interface, only: legendre_precision
-    
+
     integer, intent(in) :: n
     real(8), intent(out) :: r(n), w(n)
-    
+
     integer, parameter :: q = legendre_precision
     integer, parameter :: n_iter = 1000
     real(q) :: x, f, df, dx
@@ -735,16 +719,15 @@ subroutine gauss_legendre(n, r, w)
     end if
     Pk2(0) = 1._q  ! k = 0
     Pk1(0:1) = (/ 0._q, 1._q /)  ! k = 1
-    do k = 2, n 
-        Pk(0:k) = ( (2*k-1)*(/ 0.0_q, Pk1(0:k-1) /) - &
-                    (k-1)*(/ Pk2(0:k-2), 0._q,0._q /) ) / k
+    do k = 2, n
+        Pk(0:k) = ((2*k-1)*(/ 0.0_q, Pk1(0:k-1) /)-(k-1)*(/ Pk2(0:k-2), 0._q, 0._q /))/k
         if (k < n) then
             Pk2(0:k-1) = Pk1(0:k-1)
             Pk1(0:k) = Pk(0:k)
         end if
     end do
     ! now Pk contains k-th Legendre polynomial
-    do i = 1, n 
+    do i = 1, n
         x = cos(pi*(i-0.25_q)/(n+0.5_q))
         do iter = 1, n_iter
             df = 0._q
@@ -760,7 +743,7 @@ subroutine gauss_legendre(n, r, w)
         r(i) = dble(x)
         w(i) = dble(2/((1-x**2)*df**2))
     end do
-end subroutine gauss_legendre
+end subroutine
 
 
 subroutine destroy_grid()
@@ -789,7 +772,7 @@ subroutine init_eqi_grid(n, a, b)
 end subroutine
 
 
-function run_scs(mode, version, xyz, alpha, R_vdw, beta, a, unit_cell) & 
+function run_scs(mode, version, xyz, alpha, R_vdw, beta, a, unit_cell) &
         result(alpha_scs)
     character(len=*), intent(in) :: mode, version
     real(8), intent(in) :: &
@@ -800,19 +783,19 @@ function run_scs(mode, version, xyz, alpha, R_vdw, beta, a, unit_cell) &
         beta, a, &
         unit_cell(3, 3)
     real(8), dimension(size(alpha, 1), size(alpha, 2)) :: alpha_scs
-    
+
     real(8) :: alpha_full(3*size(xyz, 1), 3*size(xyz, 1))
     integer :: i_grid_omega
     logical :: is_parallel
     character(len=1) :: mute
-    
+
     is_parallel = is_in('P', mode)
     if (is_in('M', mode)) then
         mute = 'M'
     else
         mute = ''
     end if
-    
+
     alpha_scs(:, :) = 0.d0
     do i_grid_omega = 0, n_grid_omega
         ! MPI code begin
@@ -829,7 +812,6 @@ function run_scs(mode, version, xyz, alpha, R_vdw, beta, a, unit_cell) &
             beta=beta, &
             a=a, &
             unit_cell=unit_cell)
-        
         alpha_scs(i_grid_omega+1, :) = contract_polarizability(alpha_full)
         mute = 'M'
     end do
@@ -841,7 +823,7 @@ function run_scs(mode, version, xyz, alpha, R_vdw, beta, a, unit_cell) &
 end function run_scs
 
 
-function do_scs(mode, version, xyz, alpha, R_vdw, beta, a, lam, unit_cell) & 
+function do_scs(mode, version, xyz, alpha, R_vdw, beta, a, lam, unit_cell) &
         result(alpha_full)
     character(len=*), intent(in) :: mode, version
     real(8), intent(in) :: &
@@ -928,90 +910,69 @@ function do_scs_k_point(mode, version, xyz, alpha, k_point, R_vdw, &
     call ts(32)
     call invert(alpha_full)
     call ts(-32)
-end function 
-
-
-
+end function
 
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !!     MBD ENERGY (LAPACK/MPI)     !!
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 function get_mbd_energy(mode, version, xyz, alpha_0, omega, &
-            supercell, k_grid, unit_cell, R_vdw, beta, a, overlap, C6, &
-            damping_custom, potential_custom) result(ene)
-    character(len=*), intent(in)  :: mode, version
-    real(8), intent(in)  :: &
+        supercell, k_grid, unit_cell, R_vdw, beta, a, overlap, C6, damping_custom, &
+        potential_custom) result(ene)
+    character(len=*), intent(in) :: mode, version
+    real(8), intent(in) :: &
         xyz(:, :), &
         alpha_0(size(xyz, 1)), &
         omega(size(xyz, 1))
-    integer, intent(in), optional  :: supercell(3)
-    real(8), intent(in), optional  :: &
+    integer, intent(in), optional :: supercell(3)
+    real(8), intent(in), optional :: &
         k_grid(:, :), &
         unit_cell(3, 3)
-    real(8), intent(in), optional  :: &
+    real(8), intent(in), optional :: &
         R_vdw(size(xyz, 1)), &
         beta, a, &
         overlap(size(xyz, 1), size(xyz, 1)), &
         C6(size(xyz, 1)), &
         damping_custom(size(xyz, 1), size(xyz, 1)), &
         potential_custom(size(xyz, 1), size(xyz, 1), 3, 3)
-    real(8)  :: ene
-    
-    logical  :: is_parallel, do_rpa, is_reciprocal, is_crystal
-    real(8), allocatable     :: alpha(:, :), mode_eigs(:,:)
-    real(8), allocatable     :: eigmodes(:,:)
-    complex(8), allocatable  :: eigmodes_k(:,:,:)
-    integer                  :: i_kpt
-    
-    
+    real(8) :: ene
+
+    logical :: is_parallel, do_rpa, is_reciprocal, is_crystal
+    real(8), allocatable :: alpha(:, :), mode_eigs(:,:)
+    real(8), allocatable :: eigmodes(:,:)
+    complex(8), allocatable :: eigmodes_k(:,:,:)
+    integer :: i_kpt
+
     is_parallel = is_in('P', mode)
     is_crystal = is_in('C', mode)
     do_rpa = is_in('Q', mode)
     is_reciprocal = is_in('R', mode)
-    call print_log('---------------------------------------------------&
-                   &------------')
+    call print_log('---------------------------------------------------------------')
     call print_log('Framework:   LAPACK/MPI')
-    selectcase(trim(eigensolver))
+    select case(trim(eigensolver))
         case('qr')
             call print_log('eigensolver: QR algorithm')
         case('dandc')
             call print_log('eigensolver: Divide and Conquer')
         case('mrrr')
-            call print_log('eigensolver: Multiple Relatively Robust &
-                           &Representations (MRRR)')
-    endselect
-    call print_log('---------------------------------------------------&
-                   &------------')
+            call print_log('eigensolver: Multiple Relatively Robust Representations (MRRR)')
+    end select
+    call print_log('---------------------------------------------------------------')
     if (.not. is_crystal) then
         if (.not. do_rpa) then
+            if (is_in('E', mode)) then
+                if (allocated(mode_eigs)) deallocate (mode_eigs)
+                allocate (mode_eigs(1, 3*size(xyz, 1)))
+            end if
+            if (is_in('V', mode)) then
+                if (allocated(eigmodes)) deallocate (eigmodes)
+                allocate (eigmodes(3*size(xyz, 1), 3*size(xyz, 1)))
+            end if
+            ene = get_single_mbd_energy(mode, version, xyz, alpha_0, omega, R_vdw, &
+                beta, a, overlap, C6, damping_custom, potential_custom, unit_cell, &
+                mode_eigs(1,:), eigmodes)
             if ( is_in('E', mode) ) then
-                if ( allocated(mode_eigs) ) deallocate(mode_eigs)
-                allocate( mode_eigs(1, 3*size(xyz, 1)) )
-            endif
-            if ( is_in('V', mode) ) then
-                if ( allocated(eigmodes) ) deallocate(eigmodes)
-                allocate( eigmodes(3*size(xyz, 1), 3*size(xyz, 1)) )
-            endif
-            ene = get_single_mbd_energy(mode, &
-                                    version, &
-                                    xyz, &
-                                    alpha_0, &
-                                    omega, &
-                                    R_vdw=R_vdw, &
-                                    beta=beta, &
-                                    a=a, &
-                                    overlap=overlap, &
-                                    C6=C6, &
-                                    damping_custom=damping_custom, &
-                                    potential_custom=potential_custom, &
-                                    unit_cell=unit_cell, &
-                                    mode_enes=mode_eigs(1,:), &
-                                    modes=eigmodes)
-            
-            if ( is_in('E', mode) ) then
-                call write_eigenenergies(mode_eigs(1,:), &
-                                         "mbd_eigenenergies.out")
+                call write_eigenenergies(mode_eigs(1,:), 'mbd_eigenenergies.out')
                 deallocate(mode_eigs)
             endif
             if ( is_in('V', mode) ) then
@@ -1020,11 +981,9 @@ function get_mbd_energy(mode, version, xyz, alpha_0, omega, &
             endif
         else
             allocate (alpha(0:n_grid_omega, size(alpha_0)))
-            alpha = alpha_dynamic_ts_all(mode, n_grid_omega, alpha_0, &
-                                         C6, omega)
-            ene = get_single_rpa_energy(mode, version, xyz, alpha,R_vdw,&
-                                  beta, a, overlap, C6, damping_custom, &
-                                  potential_custom, unit_cell)
+            alpha = alpha_dynamic_ts_all(mode, n_grid_omega, alpha_0, C6, omega)
+            ene = get_single_rpa_energy(mode, version, xyz, alpha, R_vdw, beta, &
+                a, overlap, C6, damping_custom, potential_custom, unit_cell)
             deallocate (alpha)
         end if
     else
@@ -1038,29 +997,29 @@ function get_mbd_energy(mode, version, xyz, alpha_0, omega, &
                 allocate( eigmodes_k(size(k_grid, 1), 3*size(xyz, 1), &
                                      3*size(xyz, 1)) )
             endif
-            
             ene = get_reciprocal_mbd_energy(mode, &
-                                     version, &
-                                     xyz, &
-                                     alpha_0, &
-                                     omega, &
-                                     k_grid, &
-                                     unit_cell, &
-                                     R_vdw=R_vdw, &
-                                     beta=beta, &
-                                     a=a, &
-                                     overlap=overlap, &
-                                     C6=C6, &
-                                     damping_custom=damping_custom, &
-                                     potential_custom=potential_custom, &
-                                     mode_enes=mode_eigs, &
-                                     modes=eigmodes_k)
-            
+                version, &
+                xyz, &
+                alpha_0, &
+                omega, &
+                k_grid, &
+                unit_cell, &
+                R_vdw=R_vdw, &
+                beta=beta, &
+                a=a, &
+                overlap=overlap, &
+                C6=C6, &
+                damping_custom=damping_custom, &
+                potential_custom=potential_custom, &
+                mode_enes=mode_eigs, &
+                modes=eigmodes_k)
             if ( is_in('E', mode) ) then
                 do i_kpt = 1, size(k_grid, 1)
-                    call write_eigenenergies(mode_eigs(i_kpt,:), &
-                               "mbd_eigenenergies_reciprocal.out", &
-                                         k_point=k_grid(i_kpt, :))
+                    call write_eigenenergies( &
+                        mode_eigs(i_kpt,:), &
+                        'mbd_eigenenergies_reciprocal.out', &
+                        k_point=k_grid(i_kpt, :) &
+                    )
                 enddo
                 deallocate(mode_eigs)
             endif
@@ -1076,8 +1035,8 @@ function get_mbd_energy(mode, version, xyz, alpha_0, omega, &
                 deallocate(eigmodes_k)
             endif
         else
-            ene = get_supercell_mbd_energy(mode, version, xyz, alpha_0, &
-                         omega, unit_cell, supercell, R_vdw, beta, a, C6)
+            ene = get_supercell_mbd_energy(mode, version, xyz, alpha_0, omega, &
+                unit_cell, supercell, R_vdw, beta, a, C6)
         end if
     end if
 end function get_mbd_energy
@@ -1097,24 +1056,22 @@ function get_supercell_mbd_energy(mode, version, xyz, alpha_0, omega, &
         beta, a, &
         C6(size(xyz, 1))
     real(8), intent(out), optional :: rpa_orders(20)
-    
     real(8) :: ene
-    
+
     logical :: do_rpa, get_orders
     real(8) :: R_cell(3)
     integer :: i_atom, i
     integer :: i_cell
     integer :: idx_cell(3), n_cells
-    
+
     real(8), allocatable :: &
         xyz_super(:, :), alpha_0_super(:), omega_super(:), &
         R_vdw_super(:), C6_super(:), alpha_ts_super(:, :)
     real(8) :: unit_cell_super(3, 3)
-    
-    
+
     do_rpa = is_in('Q', mode)
     get_orders = is_in('O', mode)
-    
+
     n_cells = product(supercell)
     do i = 1, 3
         unit_cell_super(i, :) = unit_cell(i, :)*supercell(i)
@@ -1201,20 +1158,18 @@ function get_single_mbd_energy(mode, version, xyz, alpha_0, omega, R_vdw, &
     real(8), intent(out), optional :: &
         mode_enes(3*size(xyz, 1)), &
         modes(3*size(xyz, 1), 3*size(xyz, 1))
-    
     real(8) :: ene
-    
+
     real(8) :: relay(3*size(xyz, 1), 3*size(xyz, 1))
     real(8) :: eigs(3*size(xyz, 1))
     integer :: i_atom, j_atom, i_xyz, i, j
     integer :: n_negative_eigs
     logical :: get_eigenvalues, get_eigenvectors, is_parallel
-    
-    
+
     get_eigenvalues = is_in('E', mode)
     get_eigenvectors = is_in('V', mode)
     is_parallel = is_in('P', mode)
-    
+
     relay(:, :) = 0.d0
     call add_dipole_matrix( & ! relay = T
         mode, &
@@ -1230,7 +1185,6 @@ function get_single_mbd_energy(mode, version, xyz, alpha_0, omega, R_vdw, &
         potential_custom=potential_custom, &
         unit_cell=unit_cell, &
         relay=relay)
-    
     do i_atom = 1, size(xyz, 1)
         do j_atom = 1, size(xyz, 1)
             i = 3*i_atom-2
@@ -1259,7 +1213,6 @@ function get_single_mbd_energy(mode, version, xyz, alpha_0, omega, R_vdw, &
     end if
     ! MPI code begin
     if (is_parallel) then
-!        call broadcast(relay)
         if (get_eigenvectors) call broadcast(modes)
         call broadcast(eigs)
     end if
@@ -1303,16 +1256,14 @@ function get_reciprocal_mbd_energy(mode, version, xyz, alpha_0, omega, &
         rpa_orders(size(k_grid, 1), 20)
     complex(8), intent(out), optional :: &
         modes(size(k_grid, 1), 3*size(xyz, 1), 3*size(xyz, 1))
-    
     real(8) :: ene
-    
+
     logical :: &
         is_parallel, do_rpa, get_orders, get_eigenvalues, get_eigenvectors
     integer :: i_kpt
     real(8) :: k_point(3), alpha_ts(0:n_grid_omega, size(xyz, 1))
     character(len=1) :: mute
-    
-    
+
     is_parallel = is_in('P', mode)
     do_rpa = is_in('Q', mode)
     get_eigenvalues= is_in('E', mode)
@@ -1324,8 +1275,7 @@ function get_reciprocal_mbd_energy(mode, version, xyz, alpha_0, omega, &
         mute = ''
     end if
     if (do_rpa) then
-        alpha_ts = alpha_dynamic_ts_all('O', n_grid_omega, alpha_0, &
-                                        omega=omega)
+        alpha_ts = alpha_dynamic_ts_all('O', n_grid_omega, alpha_0, omega=omega)
     endif
     ene = 0.d0
     if (get_eigenvalues) mode_enes(:, :) = 0.d0
@@ -1374,75 +1324,72 @@ function get_reciprocal_mbd_energy(mode, version, xyz, alpha_0, omega, &
         else
             if (get_eigenvalues .and. get_eigenvectors) then
                 ene = ene+get_single_reciprocal_mbd_ene( &
-                                    blanked('P', mode)//mute, &
-                                    version, &
-                                    xyz, &
-                                    alpha_0, &
-                                    omega, &
-                                    k_point, &
-                                    unit_cell, &
-                                    R_vdw=R_vdw, &
-                                    beta=beta, &
-                                    a=a, &
-                                    overlap=overlap, &
-                                    C6=C6, &
-                                    damping_custom=damping_custom, &
-                                    potential_custom=potential_custom, &
-                                    mode_enes=mode_enes(i_kpt, :), &
-                                    modes=modes(i_kpt, :, :) )
-            
+                    blanked('P', mode)//mute, &
+                    version, &
+                    xyz, &
+                    alpha_0, &
+                    omega, &
+                    k_point, &
+                    unit_cell, &
+                    R_vdw=R_vdw, &
+                    beta=beta, &
+                    a=a, &
+                    overlap=overlap, &
+                    C6=C6, &
+                    damping_custom=damping_custom, &
+                    potential_custom=potential_custom, &
+                    mode_enes=mode_enes(i_kpt, :), &
+                    modes=modes(i_kpt, :, :))
             elseif (get_eigenvalues) then
                 ene = ene+get_single_reciprocal_mbd_ene( &
-                                    blanked('P', mode)//mute, &
-                                    version, &
-                                    xyz, &
-                                    alpha_0, &
-                                    omega, &
-                                    k_point, &
-                                    unit_cell, &
-                                    R_vdw=R_vdw, &
-                                    beta=beta, &
-                                    a=a, &
-                                    overlap=overlap, &
-                                    C6=C6, &
-                                    damping_custom=damping_custom, &
-                                    potential_custom=potential_custom, &
-                                    mode_enes=mode_enes(i_kpt, :) )
-            
+                    blanked('P', mode)//mute, &
+                    version, &
+                    xyz, &
+                    alpha_0, &
+                    omega, &
+                    k_point, &
+                    unit_cell, &
+                    R_vdw=R_vdw, &
+                    beta=beta, &
+                    a=a, &
+                    overlap=overlap, &
+                    C6=C6, &
+                    damping_custom=damping_custom, &
+                    potential_custom=potential_custom, &
+                    mode_enes=mode_enes(i_kpt, :))
             elseif (get_eigenvectors) then
                 ene = ene+get_single_reciprocal_mbd_ene( &
-                                    blanked('P', mode)//mute, &
-                                    version, &
-                                    xyz, &
-                                    alpha_0, &
-                                    omega, &
-                                    k_point, &
-                                    unit_cell, &
-                                    R_vdw=R_vdw, &
-                                    beta=beta, &
-                                    a=a, &
-                                    overlap=overlap, &
-                                    C6=C6, &
-                                    damping_custom=damping_custom, &
-                                    potential_custom=potential_custom, &
-                                    modes=modes(i_kpt, :, :) )
-            
+                    blanked('P', mode)//mute, &
+                    version, &
+                    xyz, &
+                    alpha_0, &
+                    omega, &
+                    k_point, &
+                    unit_cell, &
+                    R_vdw=R_vdw, &
+                    beta=beta, &
+                    a=a, &
+                    overlap=overlap, &
+                    C6=C6, &
+                    damping_custom=damping_custom, &
+                    potential_custom=potential_custom, &
+                    modes=modes(i_kpt, :, :))
             else
                 ene = ene+get_single_reciprocal_mbd_ene( &
-                                    blanked('P', mode)//mute, &
-                                    version, &
-                                    xyz, &
-                                    alpha_0, &
-                                    omega, &
-                                    k_point, &
-                                    unit_cell, &
-                                    R_vdw=R_vdw, &
-                                    beta=beta, &
-                                    a=a, &
-                                    overlap=overlap, &
-                                    C6=C6, &
-                                    damping_custom=damping_custom, &
-                                    potential_custom=potential_custom)
+                    blanked('P', mode)//mute, &
+                    version, &
+                    xyz, &
+                    alpha_0, &
+                    omega, &
+                    k_point, &
+                    unit_cell, &
+                    R_vdw=R_vdw, &
+                    beta=beta, &
+                    a=a, &
+                    overlap=overlap, &
+                    C6=C6, &
+                    damping_custom=damping_custom, &
+                    potential_custom=potential_custom)
             end if
         end if
         mute = 'M'
@@ -1479,20 +1426,18 @@ function get_single_reciprocal_mbd_ene(mode, version, xyz, alpha_0, omega, &
         potential_custom(size(xyz, 1), size(xyz, 1), 3, 3)
     real(8), intent(out), optional :: mode_enes(3*size(xyz, 1))
     complex(8), intent(out), optional :: modes(3*size(xyz, 1), 3*size(xyz, 1))
-    
     real(8) :: ene
-    
+
     complex(8) :: relay(3*size(xyz, 1), 3*size(xyz, 1))
     real(8) :: eigs(3*size(xyz, 1))
     integer :: i_atom, j_atom, i_xyz, i, j
     integer :: n_negative_eigs
     logical :: get_eigenvalues, get_eigenvectors, is_parallel
-    
-    
+
     get_eigenvalues = is_in('E', mode)
     get_eigenvectors = is_in('V', mode)
     is_parallel = is_in('P', mode)
-    
+
     relay(:, :) = cmplx(0.d0, 0.d0, 8)
     call add_dipole_matrix( & ! relay = T
         mode, &
@@ -1517,15 +1462,15 @@ function get_single_reciprocal_mbd_ene(mode, version, xyz, alpha_0, omega, &
                 omega(i_atom)*omega(j_atom) &
                 *sqrt(alpha_0(i_atom)*alpha_0(j_atom))* &
                 relay(i:i+2, j:j+2)
-        enddo
-    enddo
+        end do
+    end do
     do i_atom = 1, size(xyz, 1)
         do i_xyz = 1, 3
             i = 3*(i_atom-1)+i_xyz
             relay(i, i) = relay(i, i)+omega(i_atom)**2
             ! relay = w^2+sqrt(a*a)*w*w*T
-        enddo
-    enddo
+        end do
+    end do
     call ts(22)
     if (.not. is_parallel .or. my_task == 0) then
         if (get_eigenvectors) then
@@ -1533,20 +1478,19 @@ function get_single_reciprocal_mbd_ene(mode, version, xyz, alpha_0, omega, &
             modes = relay
         else
             call sdiagonalize('N', relay, eigs)
-        endif
-    endif
+        end if
+    end if
     ! MPI code begin
     if (is_parallel) then
-        call broadcast(eigs)
-!        call broadcast(relay)
         if (get_eigenvectors) call broadcast(modes)
-    endif
+        call broadcast(eigs)
+    end if
     ! MPI code end
     call ts(-22)
     if (get_eigenvalues) then
         mode_enes(:) = 0.d0
         where (eigs > 0) mode_enes = sqrt(eigs)
-    endif
+    end if
     n_negative_eigs = count(eigs(:) < 0)
     if (n_negative_eigs > 0) then
         call print_warning( &
@@ -1554,7 +1498,7 @@ function get_single_reciprocal_mbd_ene(mode, version, xyz, alpha_0, omega, &
             " negative eigenvalues" &
         )
         if (param_zero_negative_eigs) where (eigs < 0) eigs = 0.d0
-    endif
+    end if
     ene = 1.d0/2*sum(sqrt(eigs))-3.d0/2*sum(omega)
 end function get_single_reciprocal_mbd_ene
 
@@ -1575,17 +1519,15 @@ function get_single_rpa_energy(mode, version, xyz, alpha, R_vdw, beta, &
         potential_custom(size(xyz, 1), size(xyz, 1), 3, 3), &
         unit_cell(3, 3)
     real(8), intent(out), optional :: rpa_orders(20)
-    
     real(8) :: ene
-    
+
     real(8), dimension(3*size(xyz, 1), 3*size(xyz, 1)) :: relay, AT
     complex(8) :: eigs(3*size(xyz, 1))
     integer :: i_atom, i_xyz, i_grid_omega, i
     integer :: n_order, n_negative_eigs
     logical :: is_parallel, get_orders
     character(len=1) :: mute
-    
-    
+
     is_parallel = is_in('P', mode)
     get_orders = is_in('O', mode)
     if (is_in('M', mode)) then
@@ -1593,7 +1535,7 @@ function get_single_rpa_energy(mode, version, xyz, alpha, R_vdw, beta, &
     else
         mute = ''
     end if
-    
+
     ene = 0.d0
     do i_grid_omega = 0, n_grid_omega
         ! MPI code begin
@@ -1619,7 +1561,7 @@ function get_single_rpa_energy(mode, version, xyz, alpha, R_vdw, beta, &
         do i_atom = 1, size(xyz, 1)
             do i_xyz = 1, 3
                 i = (i_atom-1)*3+i_xyz
-                relay(i, :) = alpha(i_grid_omega+1, i_atom)*relay(i, :) 
+                relay(i, :) = alpha(i_grid_omega+1, i_atom)*relay(i, :)
                 ! relay = alpha*T
             end do
         end do
@@ -1680,17 +1622,15 @@ function get_single_reciprocal_rpa_ene(mode, version, xyz, alpha, k_point, &
         damping_custom(size(xyz, 1), size(xyz, 1)), &
         potential_custom(size(xyz, 1), size(xyz, 1), 3, 3)
     real(8), intent(out), optional :: rpa_orders(20)
-    
     real(8) :: ene
-    
+
     complex(8), dimension(3*size(xyz, 1), 3*size(xyz, 1)) :: relay, AT
     complex(8) :: eigs(3*size(xyz, 1))
     integer :: i_atom, i_xyz, i_grid_omega, i
     integer :: n_order, n_negative_eigs
     logical :: is_parallel, get_orders
     character(len=1) :: mute
-    
-    
+
     is_parallel = is_in('P', mode)
     get_orders = is_in('O', mode)
     if (is_in('M', mode)) then
@@ -1726,7 +1666,7 @@ function get_single_reciprocal_rpa_ene(mode, version, xyz, alpha, k_point, &
         do i_atom = 1, size(xyz, 1)
             do i_xyz = 1, 3
                 i = (i_atom-1)*3+i_xyz
-                relay(i, :) = alpha(i_grid_omega+1, i_atom)*relay(i, :) 
+                relay(i, :) = alpha(i_grid_omega+1, i_atom)*relay(i, :)
                 ! relay = alpha*T
             end do
         end do
@@ -1770,13 +1710,9 @@ function get_single_reciprocal_rpa_ene(mode, version, xyz, alpha, k_point, &
 end function get_single_reciprocal_rpa_ene
 
 
-
-
-
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !!     ADDITIONAL ANALYSIS TOOLS     !!
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-
 
 ! function mbd_nbody( &
 !         xyz, &
@@ -1852,8 +1788,7 @@ end function get_single_reciprocal_rpa_ene
 ! end function mbd_nbody
 
 
-function eval_mbd_nonint_density(pts, xyz, charges, masses, omegas) &
-                                 result(rho)
+function eval_mbd_nonint_density(pts, xyz, charges, masses, omegas) result(rho)
     real(8), intent(in) :: &
         pts(:, :), &
         xyz(:, :), &
@@ -1880,8 +1815,7 @@ function eval_mbd_nonint_density(pts, xyz, charges, masses, omegas) &
 end function
 
 
-function eval_mbd_int_density(pts, xyz, charges, masses, omegas, modes) &
-                              result(rho)
+function eval_mbd_int_density(pts, xyz, charges, masses, omegas, modes) result(rho)
     real(8), intent(in) :: &
         pts(:, :), &
         xyz(:, :), &
@@ -1937,31 +1871,31 @@ end function
 function eval_mbd_int_density_io(gridpts, xyz, charges, masses, &
                                  omega_int, fname_modes) &
                                  result(rho)
-    real(8),          intent(in)  :: gridpts(:, :), &
+    real(8),          intent(in) :: gridpts(:, :), &
                                      xyz(:, :), &
                                      charges(size(xyz, 1)), &
                                      masses(size(xyz, 1)), &
                                      omega_int(3*size(xyz, 1))
-    character(len=*), intent(in)  :: fname_modes
-    
-    real(8)  :: rho(size(gridpts, 1))
-    
-    integer  :: i_pt, i_atom, n_atoms, i, i_xyz, j_xyz
-    integer  :: self(3), other(3*(size(xyz, 1)-1))
-    real(8)  :: pre(size(xyz, 1)), &
+    character(len=*), intent(in) :: fname_modes
+
+    real(8) :: rho(size(gridpts, 1))
+
+    integer :: i_pt, i_atom, n_atoms, i, i_xyz, j_xyz
+    integer :: self(3), other(3*(size(xyz, 1)-1))
+    real(8) :: pre(size(xyz, 1)), &
                 factor(size(xyz, 1)), &
                 rdiffsq(3,3), &
                 kernel(3, 3, size(xyz, 1)), &
                 rdiff(3), om_3_3(3,3), &
                 evals_oo(3*(size(xyz, 1)-1)), &
                 om_ss(3,3)
-                
-    real(8), allocatable  :: modes(:,:), mm_helper(:,:), omegas_p(:,:), &
+
+    real(8), allocatable :: modes(:,:), mm_helper(:,:), omegas_p(:,:), &
                              om_oo(:,:), om_oo_inv(:,:), om_helper(:,:),&
                              om_so(:,:)
-                             
-                             
-    n_atoms = size(xyz, 1)   
+
+
+    n_atoms = size(xyz, 1)
     allocate( modes(3*n_atoms, 3*n_atoms) )
     call read_mbd_modes(modes, fname_modes)
     allocate( mm_helper(3*n_atoms, 3*n_atoms) )
@@ -2000,9 +1934,9 @@ function eval_mbd_int_density_io(gridpts, xyz, charges, masses, &
         om_so = omegas_p(other, self)
         call DGEMM('N', 'N', 3, 3, 3*(n_atoms-1), 1.d0, om_helper, 3, &
                    om_so, 3*(n_atoms-1), 0.d0, om_3_3, 3)
-        
+
         kernel(:, :, i_atom) = masses(i_atom)*( om_ss - om_3_3 )
-        
+
         evals_oo = sdiagonalized(om_oo)
         pre(i_atom) = charges(i_atom)*(masses(i_atom)/pi)**(3.d0/2)*&
                       sqrt(product(omega_int(:3*n_atoms-3)/evals_oo)*&
@@ -2015,7 +1949,7 @@ function eval_mbd_int_density_io(gridpts, xyz, charges, masses, &
     deallocate( om_so )
     call sync_sum(kernel)
     call sync_sum(pre)
-    
+
     rho(:) = 0.d0
     do i_pt=1, size(gridpts, 1)
         if (my_task /= modulo(i_pt, n_tasks)) cycle
@@ -2029,39 +1963,39 @@ function eval_mbd_int_density_io(gridpts, xyz, charges, masses, &
         rho(i_pt) = sum(pre*exp(-factor))
     enddo
     call sync_sum(rho)
-    
+
 end function
 
 
 function eval_mbd_drho_int_nonint_io(gridpts, xyz, charges, masses, &
                                      omega_int, omegas0, fname_modes) &
                                      result(drho)
-    real(8),          intent(in)  :: gridpts(:, :), &
+    real(8),          intent(in) :: gridpts(:, :), &
                                      xyz(:, :), &
                                      charges(size(xyz, 1)), &
                                      masses(size(xyz, 1)), &
                                      omega_int(3*size(xyz, 1)), &
                                      omegas0(size(xyz, 1))
-    character(len=*), intent(in)  :: fname_modes
-    
-    real(8)  :: drho(size(gridpts, 1))
-    
-    integer  :: i_pt, i_atom, n_atoms, i, i_xyz, j_xyz
-    integer  :: self(3), other(3*(size(xyz, 1)-1))
-    real(8)  :: pre(size(xyz, 1)), &
+    character(len=*), intent(in) :: fname_modes
+
+    real(8) :: drho(size(gridpts, 1))
+
+    integer :: i_pt, i_atom, n_atoms, i, i_xyz, j_xyz
+    integer :: self(3), other(3*(size(xyz, 1)-1))
+    real(8) :: pre(size(xyz, 1)), &
                 factor(size(xyz, 1)), &
                 rdiffsq(3, 3), &
                 kernel(3, 3, size(xyz, 1)), &
                 rdiff(3), om_3_3(3,3), rho_ni_ipt, &
                 evals_oo(3*(size(xyz, 1)-1)), &
                 om_ss(3, 3)
-    
-    real(8), allocatable  :: modes(:,:), mm_helper(:,:), omegas_p(:,:), &
+
+    real(8), allocatable :: modes(:,:), mm_helper(:,:), omegas_p(:,:), &
                              om_oo_inv(:,:), om_helper(:,:), pre_ni(:), &
                              kernel_ni(:), rsq(:), om_oo(:,:), &
                              om_so(:,:), om_os(:,:)
-    
-    
+
+
     n_atoms = size(xyz, 1)
     allocate( modes(3*n_atoms, 3*n_atoms) )
     call read_mbd_modes(modes, fname_modes)
@@ -2102,9 +2036,9 @@ function eval_mbd_drho_int_nonint_io(gridpts, xyz, charges, masses, &
                   om_so, 3, om_oo_inv, 3*(n_atoms-1), 0.d0, om_helper, 3)
         call DGEMM('N', 'N', 3, 3, 3*(n_atoms-1), 1.d0, om_helper, 3, &
                    om_so, 3*(n_atoms-1), 0.d0, om_3_3, 3)
-        
+
         kernel(:, :, i_atom) = masses(i_atom)*( om_ss - om_3_3 )
-        
+
         evals_oo = sdiagonalized(om_oo)
         pre(i_atom) = charges(i_atom)*(masses(i_atom)/pi)**(3.d0/2)*&
                       sqrt(product(omega_int(:3*n_atoms-3)/evals_oo)*&
@@ -2118,13 +2052,13 @@ function eval_mbd_drho_int_nonint_io(gridpts, xyz, charges, masses, &
     deallocate( om_os )
     call sync_sum(kernel)
     call sync_sum(pre)
-    
+
     allocate( pre_ni(n_atoms) )
     allocate( kernel_ni(n_atoms) )
     allocate( rsq(n_atoms) )
     pre_ni = charges*(masses*omegas0/pi)**(3.d0/2)
     kernel_ni = masses*omegas0
-    
+
     drho(:) = 0.d0
     do i_pt=1, size(gridpts, 1)
         if (my_task /= modulo(i_pt, n_tasks)) cycle
@@ -2169,27 +2103,27 @@ subroutine get_interaction_modes(mode, version, xyz, alpha_0, omega, &
                                  k_grid, prefix_mbd_modes)
     !! calculates contribution to full MBD mode, which describes
     !! interaction between subsytems
-    character(len=*), intent(in)   :: mode, version
-    real(8), intent(in)            :: xyz(:,:), alpha_0(size(xyz, 1)), &
+    character(len=*), intent(in) :: mode, version
+    real(8), intent(in) :: xyz(:,:), alpha_0(size(xyz, 1)), &
                                       omega(size(xyz,1)), &
                                       R_vdw(size(xyz, 1)), &
                                       beta, a, &
                                       C6(size(xyz, 1))
-    integer, intent(in)            :: indices_subsystem1(:), &
+    integer, intent(in) :: indices_subsystem1(:), &
                                       indices_subsystem2(:)
-    real(8), intent(in)            :: ene_full(3*size(xyz,1))
-    
-    real(8), intent(in), optional  :: unit_cell(3,3), k_grid(:,:)
-    character(len=*), intent(in), optional  :: prefix_mbd_modes
-    
-    real(8), allocatable           :: modes_int(:,:)
-    complex(8), allocatable        :: modes_int_c(:,:)
-    character(len=50)              :: prefix_in
-    integer                        :: ik
-    logical                        :: is_crystal
-    real(8)                        :: k_point(3)
-    
-    
+    real(8), intent(in) :: ene_full(3*size(xyz,1))
+
+    real(8), intent(in), optional :: unit_cell(3,3), k_grid(:,:)
+    character(len=*), intent(in), optional :: prefix_mbd_modes
+
+    real(8), allocatable :: modes_int(:,:)
+    complex(8), allocatable :: modes_int_c(:,:)
+    character(len=50) :: prefix_in
+    integer :: ik
+    logical :: is_crystal
+    real(8) :: k_point(3)
+
+
     if (present(prefix_mbd_modes)) then
         prefix_in = prefix_mbd_modes
     else
@@ -2202,7 +2136,7 @@ subroutine get_interaction_modes(mode, version, xyz, alpha_0, omega, &
                          R_vdw, beta, a, C6, indices_subsystem1, &
                          indices_subsystem2, trim(prefix_in)//".out", &
                          ene_full, modes_int)
-        
+
         call DWRITEEIGVEC(modes_int, "mbd_interactionmodes.out")
         deallocate(modes_int)
     else
@@ -2215,7 +2149,7 @@ subroutine get_interaction_modes(mode, version, xyz, alpha_0, omega, &
                    k_point, indices_subsystem1, indices_subsystem2, &
                    trim(prefix_in)//"_kpt"//trim(tostr(ik))//".out", &
                    ene_full, modes_int_c)
-            
+
             call ZWRITEEIGVEC(modes_int_c, &
                  "mbd_interactionmodes_kpt"//trim(tostr(ik))//".out",&
                  kpoint=k_point)
@@ -2230,35 +2164,35 @@ subroutine get_single_int_modes(mode, version, xyz, alpha_0, omega, &
                                 R_vdw, beta, a, C6, indices_subsystem1, &
                                 indices_subsystem2, fname_modes, &
                                 ene_full, modes_int)
-    character(len=*), intent(in)  :: mode, version
-    real(8), intent(in)           :: xyz(:,:), alpha_0(size(xyz, 1)), &
+    character(len=*), intent(in) :: mode, version
+    real(8), intent(in) :: xyz(:,:), alpha_0(size(xyz, 1)), &
                                      omega(size(xyz,1)), &
                                      R_vdw(size(xyz, 1)), &
                                      beta, a, &
                                      C6(size(xyz, 1))
-    integer, intent(in)           :: indices_subsystem1(:), &
+    integer, intent(in) :: indices_subsystem1(:), &
                                      indices_subsystem2(:)
-    character(len=*), intent(in)  :: fname_modes
-    real(8), intent(in)           :: ene_full(3*size(xyz, 1))
-    
-    real(8), intent(inout)        :: &
+    character(len=*), intent(in) :: fname_modes
+    real(8), intent(in) :: ene_full(3*size(xyz, 1))
+
+    real(8), intent(inout) :: &
                                modes_int(3*size(xyz, 1), 3*size(xyz, 1))
-    
-    real(8), allocatable          :: modes(:,:), h_int(:,:)
-    integer                       :: i, nModes
-    
-    
+
+    real(8), allocatable :: modes(:,:), h_int(:,:)
+    integer :: i, nModes
+
+
     nModes = 3*size(xyz,1)
     allocate( h_int(nModes,nModes) )
     call build_h_int(mode, version, xyz, alpha_0, omega, R_vdW, beta, &
                      a, C6, indices_subsystem1, indices_subsystem2, &
                      h_int=h_int)
-    
+
     allocate( modes(nModes, nModes) )
     call read_mbd_modes(modes, fname_modes)
     call DGEMM('N','N', nModes, nModes, nModes, 1.d0, h_int, nModes, &
                modes, nModes, 0.d0, modes_int, nModes)
-    
+
     deallocate(modes)
     do i=1,nModes
         modes_int(i,:) = modes_int(i,:)/ene_full(i)
@@ -2271,36 +2205,36 @@ subroutine get_single_reciprocal_int_modes(mode, version, xyz, alpha_0, &
                          omega, R_vdw, beta, a, C6, unit_cell, k_point, &
                          indices_subsystem1, indices_subsystem2, &
                          fname_modes, ene_full, modes_int)
-    character(len=*), intent(in)  :: mode, version
-    real(8), intent(in)           :: xyz(:,:), alpha_0(size(xyz, 1)), &
+    character(len=*), intent(in) :: mode, version
+    real(8), intent(in) :: xyz(:,:), alpha_0(size(xyz, 1)), &
                                      omega(size(xyz,1)), &
                                      R_vdw(size(xyz, 1)), &
                                      beta, a, &
                                      C6(size(xyz, 1)), &
                                      unit_cell(3,3), &
                                      k_point(3)
-    integer, intent(in)           :: indices_subsystem1(:), &
+    integer, intent(in) :: indices_subsystem1(:), &
                                      indices_subsystem2(:)
-    character(len=*), intent(in)  :: fname_modes
-    real(8), intent(in)           :: ene_full(3*size(xyz, 1))
-    
-    complex(8), intent(inout)     :: modes_int(3*size(xyz, 1), 3*size(xyz, 1))
-    
-    complex(8), allocatable       :: modes(:,:), h_int(:,:)
-    integer                       :: i, nModes
-    
-    
+    character(len=*), intent(in) :: fname_modes
+    real(8), intent(in) :: ene_full(3*size(xyz, 1))
+
+    complex(8), intent(inout) :: modes_int(3*size(xyz, 1), 3*size(xyz, 1))
+
+    complex(8), allocatable :: modes(:,:), h_int(:,:)
+    integer :: i, nModes
+
+
     nModes = 3*size(xyz,1)
     allocate( h_int(nModes,nModes) )
     call build_h_int(mode, version, xyz, alpha_0, omega, R_vdW, beta, &
                      a, C6, indices_subsystem1, indices_subsystem2, &
                      unit_cell=unit_cell, k_point=k_point, h_int_c=h_int)
-    
+
     allocate( modes(nModes,nModes) )
     call read_mbd_modes_reciprocal(modes, fname_modes)
     call ZGEMM('N','N', nModes, nModes, nModes, 1.d0, h_int, nModes, &
                modes, nModes, 0.d0, modes_int, nModes)
-    
+
     deallocate(modes)
     do i=1,nModes
         modes_int(i, :) = modes_int(i,:)/ene_full(i)
@@ -2317,34 +2251,34 @@ subroutine build_h_int(mode, version, xyz, alpha, omega, R_vdw, beta, &
     !!              /   0     V_{21} \
     !!   H_{int} = |                  |
     !!              \ V_{12}    0    /
-    
-    character(len=*), intent(in)   :: mode, version
-    real(8), intent(in)            :: xyz(:, :), alpha(size(xyz, 1)), &
+
+    character(len=*), intent(in) :: mode, version
+    real(8), intent(in) :: xyz(:, :), alpha(size(xyz, 1)), &
                                       omega(size(xyz,1)), &
                                       R_vdw(size(xyz, 1)), &
                                       beta, a, &
                                       C6(size(xyz, 1))
-    integer, intent(in)            :: indices_subsystem1(:), &
+    integer, intent(in) :: indices_subsystem1(:), &
                                       indices_subsystem2(:)
-    
-    real(8), intent(in), optional  :: unit_cell(3, 3), k_point(3)
-    
-    real(8), intent(inout), optional     :: &
+
+    real(8), intent(in), optional :: unit_cell(3, 3), k_point(3)
+
+    real(8), intent(inout), optional :: &
                                  h_int(3*size(xyz, 1), 3*size(xyz, 1))
-    complex(8), intent(inout), optional  :: &
+    complex(8), intent(inout), optional :: &
                                  h_int_c(3*size(xyz, 1), 3*size(xyz, 1))
-    
-    real(8)           :: Tpp(3, 3), R_cell(3), r(3), r_norm, R_vdw_ij, &
+
+    real(8) :: Tpp(3, 3), R_cell(3), r(3), r_norm, R_vdw_ij, &
                          C6_ij, sigma_ij, volume, ewald_alpha, &
                          real_space_cutoff, wwsqrtaa
-    complex(8)        :: Tpp_c(3, 3)
-    character(len=1)  :: parallel_mode
-    integer           :: i_atom, j_atom, i_cell, idx_cell(3), &
+    complex(8) :: Tpp_c(3, 3)
+    character(len=1) :: parallel_mode
+    integer :: i_atom, j_atom, i_cell, idx_cell(3), &
                          range_cell(3), i, j, ii, jj
-    logical           :: is_crystal, is_parallel, is_reciprocal, &
-                         is_low_dim, mute, do_ewald    
-    
-    
+    logical :: is_crystal, is_parallel, is_reciprocal, &
+                         is_low_dim, mute, do_ewald
+
+
     is_parallel = is_in('P', mode)
     is_reciprocal = is_in('R', mode)
     is_crystal = is_in('C', mode) .or. is_reciprocal
@@ -2355,13 +2289,13 @@ subroutine build_h_int(mode, version, xyz, alpha, omega, R_vdw, beta, &
         parallel_mode = 'A' ! atoms
         if (is_crystal .and. size(xyz, 1) < n_tasks) then
             parallel_mode = 'C' ! cells
-        end if 
+        end if
     else
         parallel_mode = ''
     end if
-        
+
     ! MPI code begin
-    if (is_parallel) then 
+    if (is_parallel) then
         ! will be restored by syncing at the end
         if (is_reciprocal) then
             h_int_c = h_int_c/n_tasks
@@ -2380,20 +2314,20 @@ subroutine build_h_int(mode, version, xyz, alpha, omega, R_vdw, beta, &
             real_space_cutoff = 6.d0/ewald_alpha*param_ewald_real_cutoff_scaling
             call print_log('Ewald: using alpha = '//trim(tostr(ewald_alpha)) &
                 //', real cutoff = '//trim(tostr(real_space_cutoff)), mute)
-        else 
+        else
             real_space_cutoff = param_dipole_cutoff
         end if
         range_cell = supercell_circum(unit_cell, real_space_cutoff)
-    else    
+    else
         range_cell = (/ 0, 0, 0 /)
-    end if      
+    end if
     if (is_crystal) then
         call print_log('Ewald: summing real part in cell vector range of '&
             //trim(tostr(1+2*range_cell(1)))//'x' &
             //trim(tostr(1+2*range_cell(2)))//'x' &
             //trim(tostr(1+2*range_cell(3))), mute)
     end if
-    call ts(11) 
+    call ts(11)
     idx_cell = (/ 0, 0, -1 /)
     do i_cell = 1, product(1+2*range_cell)
         call shift_cell(idx_cell, -range_cell, range_cell)
@@ -2405,8 +2339,8 @@ subroutine build_h_int(mode, version, xyz, alpha, omega, R_vdw, beta, &
         if (is_crystal) then
             R_cell = matmul(idx_cell, unit_cell)
         else
-            R_cell(:) = 0.d0 
-        end if 
+            R_cell(:) = 0.d0
+        end if
         do ii=1, size(indices_subsystem1)
             i_atom = indices_subsystem1(ii)
             ! MPI code begin
@@ -2493,7 +2427,7 @@ subroutine build_h_int(mode, version, xyz, alpha, omega, R_vdw, beta, &
                               indices_subsystem1, indices_subsystem2, &
                               k_point, h_int, h_int_c)
     end if
-    
+
     !! update off-diagonal blocks such that H_int = w*w*sqrt(a*a)*T
     do ii=1, size(indices_subsystem1)
         i_atom = indices_subsystem1(ii)
@@ -2519,27 +2453,27 @@ end subroutine build_h_int
 subroutine add_ewald_h_int_parts(mode, xyz, unit_cell, alpha, &
                                  indices_subsystem1, indices_subsystem2,&
                                  k_point, h_int, h_int_c)
-    character(len=*), intent(in)   :: mode
-    real(8), intent(in)            :: xyz(:, :), unit_cell(3, 3), alpha
-    integer, intent(in)            :: indices_subsystem1(:), &
+    character(len=*), intent(in) :: mode
+    real(8), intent(in) :: xyz(:, :), unit_cell(3, 3), alpha
+    integer, intent(in) :: indices_subsystem1(:), &
                                       indices_subsystem2(:)
-    
-    real(8), intent(in), optional       :: k_point(3)
-    real(8), intent(inout), optional    :: &
+
+    real(8), intent(in), optional :: k_point(3)
+    real(8), intent(inout), optional :: &
                                  h_int(3*size(xyz, 1), 3*size(xyz, 1))
     complex(8), intent(inout), optional :: &
                                  h_int_c(3*size(xyz, 1), 3*size(xyz, 1))
-    
-    logical          :: is_parallel, is_reciprocal, mute, do_surface
-    real(8)          :: rec_unit_cell(3, 3), volume, G_vector(3), r(3), &
+
+    logical :: is_parallel, is_reciprocal, mute, do_surface
+    real(8) :: rec_unit_cell(3, 3), volume, G_vector(3), r(3), &
                         k_total(3), k_sq, rec_space_cutoff, Tpp(3, 3), &
                         k_prefactor(3, 3), elem
-    complex(8)       :: Tpp_c(3, 3)
-    integer          :: i_atom, j_atom, i, j, i_xyz, j_xyz, ii, jj, &
+    complex(8) :: Tpp_c(3, 3)
+    integer :: i_atom, j_atom, i, j, i_xyz, j_xyz, ii, jj, &
                         idx_G_vector(3), i_G_vector, range_G_vector(3)
     character(len=1) :: parallel_mode
-    
-    
+
+
     is_parallel = is_in('P', mode)
     is_reciprocal = is_in('R', mode)
     mute = is_in('M', mode)
@@ -2551,7 +2485,7 @@ subroutine add_ewald_h_int_parts(mode, xyz, unit_cell, alpha, &
     else
         parallel_mode = ''
     end if
-    
+
     ! MPI code begin
     if (is_parallel) then
         ! will be restored by syncing at the end
@@ -2689,28 +2623,28 @@ subroutine get_onsite_modes(mode, version, xyz, alpha_0, omega, R_vdw, &
                             k_grid, prefix_mbd_modes)
     !! calculates contribution to full MBD mode, which describes
     !! interaction between subsytems
-    character(len=*), intent(in)   :: mode, version
-    real(8), intent(in)            :: xyz(:,:), alpha_0(size(xyz, 1)), &
+    character(len=*), intent(in) :: mode, version
+    real(8), intent(in) :: xyz(:,:), alpha_0(size(xyz, 1)), &
                                       omega(size(xyz,1)), &
                                       R_vdw(size(xyz, 1)), &
                                       beta, a, &
                                       C6(size(xyz, 1))
-    integer, intent(in)            :: indices_subsystem1(:), &
+    integer, intent(in) :: indices_subsystem1(:), &
                                       indices_subsystem2(:)
-    real(8), intent(in)            :: ene_full(3*size(xyz, 1))
-    
-    real(8), intent(in), optional  :: unit_cell(3,3), k_grid(:,:)
-    character(len=*), intent(in), optional  :: prefix_mbd_modes
-    
-    real(8), allocatable           :: modes_on(:,:)
-    complex(8), allocatable        :: modes_on_c(:,:)
-    character(len=100)  :: prefix_in
-    logical                        :: is_crystal
-    integer                        :: ik
-    real(8)                        :: k_point(3)
-    
-    
-    
+    real(8), intent(in) :: ene_full(3*size(xyz, 1))
+
+    real(8), intent(in), optional :: unit_cell(3,3), k_grid(:,:)
+    character(len=*), intent(in), optional :: prefix_mbd_modes
+
+    real(8), allocatable :: modes_on(:,:)
+    complex(8), allocatable :: modes_on_c(:,:)
+    character(len=100) :: prefix_in
+    logical :: is_crystal
+    integer :: ik
+    real(8) :: k_point(3)
+
+
+
     if (present(prefix_mbd_modes)) then
         prefix_in = prefix_mbd_modes
     else
@@ -2723,7 +2657,7 @@ subroutine get_onsite_modes(mode, version, xyz, alpha_0, omega, R_vdw, &
                  R_vdw, beta, a, C6, ene_full, indices_subsystem1, &
                  indices_subsystem2, trim(prefix_in)//".out", &
                  modes_on)
-        
+
         call DWRITEEIGVEC(modes_on, "mbd_onsitemodes.out")
         deallocate(modes_on)
     else
@@ -2737,7 +2671,7 @@ subroutine get_onsite_modes(mode, version, xyz, alpha_0, omega, R_vdw, &
                      indices_subsystem1, indices_subsystem2, &
                      trim(prefix_in)//"_kpt"//trim(tostr(ik))//".out", &
                      modes_on_c)
-            
+
             call ZWRITEEIGVEC(modes_on_c, &
                          "mbd_onsitemodes_kpt"//trim(tostr(ik))//".out",&
                          kpoint=k_point)
@@ -2752,29 +2686,29 @@ subroutine get_single_on_modes(mode, version, xyz, alpha_0, omega, &
                                R_vdw, beta, a, C6, ene_full, &
                                indices_subsystem1, indices_subsystem2, &
                                fname_modes, modes_on)
-    character(len=*), intent(in)  :: mode, version
-    real(8), intent(in)           :: xyz(:,:), alpha_0(size(xyz, 1)), &
+    character(len=*), intent(in) :: mode, version
+    real(8), intent(in) :: xyz(:,:), alpha_0(size(xyz, 1)), &
                                      omega(size(xyz,1)), &
                                      R_vdw(size(xyz, 1)), &
                                      beta, a, &
                                      C6(size(xyz, 1)), &
                                      ene_full(3*size(xyz,1))
-    integer, intent(in)           :: indices_subsystem1(:), &
+    integer, intent(in) :: indices_subsystem1(:), &
                                      indices_subsystem2(:)
-    character(len=*), intent(in)  :: fname_modes
-    
-    real(8), intent(inout)  :: modes_on(3*size(xyz,1),3*size(xyz,1))
-    
-    real(8), allocatable    :: modes(:,:)
-    integer                 :: i, nModes
-    
-    
+    character(len=*), intent(in) :: fname_modes
+
+    real(8), intent(inout) :: modes_on(3*size(xyz,1),3*size(xyz,1))
+
+    real(8), allocatable :: modes(:,:)
+    integer :: i, nModes
+
+
     nModes = 3*size(xyz,1)
     call get_single_int_modes(mode, version, xyz, alpha_0, omega, &
                               R_vdw, beta, a, C6, indices_subsystem1, &
                               indices_subsystem2, fname_modes, &
                               ene_full, modes_on)
-    
+
     allocate( modes(nModes,nModes) )
     call read_mbd_modes(modes, fname_modes)
     do i=1, nModes
@@ -2789,8 +2723,8 @@ subroutine get_single_reciprocal_on_modes(mode, version, xyz, alpha_0, &
                      omega, R_vdw, beta, a, C6, ene_full, unit_cell, &
                      k_point, indices_subsystem1, indices_subsystem2, &
                      fname_modes, modes_on)
-    character(len=*), intent(in)  :: mode, version
-    real(8), intent(in)           :: xyz(:,:), alpha_0(size(xyz, 1)), &
+    character(len=*), intent(in) :: mode, version
+    real(8), intent(in) :: xyz(:,:), alpha_0(size(xyz, 1)), &
                                      omega(size(xyz,1)), &
                                      R_vdw(size(xyz, 1)), &
                                      beta, a, &
@@ -2798,22 +2732,22 @@ subroutine get_single_reciprocal_on_modes(mode, version, xyz, alpha_0, &
                                      ene_full(3*size(xyz,1)), &
                                      unit_cell(3,3), &
                                      k_point(3)
-    integer, intent(in)           :: indices_subsystem1(:), &
+    integer, intent(in) :: indices_subsystem1(:), &
                                      indices_subsystem2(:)
-    character(len=*), intent(in)  :: fname_modes
-    
-    complex(8), intent(inout)  :: modes_on(3*size(xyz,1),3*size(xyz,1))
-    
-    complex(8), allocatable    :: modes(:,:)
-    integer                    :: i, nModes
-    
-    
+    character(len=*), intent(in) :: fname_modes
+
+    complex(8), intent(inout) :: modes_on(3*size(xyz,1),3*size(xyz,1))
+
+    complex(8), allocatable :: modes(:,:)
+    integer :: i, nModes
+
+
     nModes = 3*size(xyz,1)
     call get_single_reciprocal_int_modes(mode, version, xyz, alpha_0, &
                        omega, R_vdw, beta, a, C6, unit_cell, k_point, &
                        indices_subsystem1, indices_subsystem2, &
                        fname_modes, ene_full, modes_on)
-    
+
     allocate( modes(nModes,nModes) )
     call read_mbd_modes_reciprocal(modes, fname_modes)
     do i=1, nModes
@@ -2825,11 +2759,11 @@ end subroutine get_single_reciprocal_on_modes
 
 
 subroutine read_mbd_modes(modes, filenam)
-    real(8), intent(inout)        :: modes(:,:)
-    character(len=*), intent(in)  :: filenam
-    integer                       :: fID_V, nModes, buffer_n, i, iMode
-    
-    
+    real(8), intent(inout) :: modes(:,:)
+    character(len=*), intent(in) :: filenam
+    integer :: fID_V, nModes, buffer_n, i, iMode
+
+
     fID_V = get_FileID()
     open( file=trim(filenam), unit=fID_V, status='old', &
           form='unformatted' )
@@ -2849,18 +2783,18 @@ end subroutine read_mbd_modes
 
 
 subroutine read_mbd_modes_reciprocal(modes, filenam)
-    complex(8), intent(inout)      :: modes(:,:)
-    character(len=*), intent(in)   :: filenam
-    real(8)                        :: buffer_k(3)
-    integer                        :: fID_V, nModes, buffer_n, i, iMode
-    
-    
+    complex(8), intent(inout) :: modes(:,:)
+    character(len=*), intent(in) :: filenam
+    real(8) :: buffer_k(3)
+    integer :: fID_V, nModes, buffer_n, i, iMode
+
+
     fID_V = get_FileID()
     open( file=trim(filenam), unit=fID_V, status='old', &
           form='unformatted' )
     read(fID_V) nModes, buffer_n
     read(fID_V) buffer_k
-    
+
     if (nModes /= size(modes,1)) then
         call print_error(" Size of eigenmode input file does not match system.")
     endif
@@ -2873,10 +2807,6 @@ subroutine read_mbd_modes_reciprocal(modes, filenam)
     close(fID_V)
 
 end subroutine read_mbd_modes_reciprocal
-
-
-
-
 
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !!    SCS/MBD (LAPACK/MPI) HELPER FUNCTIONS     !!
@@ -2973,13 +2903,13 @@ subroutine diagonalize_sym_dble_(mode, A, eigs)
     character(len=1), intent(in) :: mode
     real(8), intent(inout) :: A(:, :)
     real(8), intent(out) :: eigs(size(A, 1))
-    
+
     real(8) :: lwork_arr
     real(8), allocatable :: work_arr(:), vecs(:,:)
     integer :: n, vl, vu, il, iu, nvals
-    integer, allocatable  :: iwork_arr(:), isupp(:)
+    integer, allocatable :: iwork_arr(:), isupp(:)
     integer :: error_flag, lwork, liwork
-    
+
     n = size(A, 1)
     if ( allocated(work_arr) ) deallocate(work_arr)
     allocate( work_arr(1) )
@@ -2990,7 +2920,7 @@ subroutine diagonalize_sym_dble_(mode, A, eigs)
             deallocate(work_arr)
             allocate ( work_arr(lwork) )
             call DSYEV(mode, "U", n, A, n, eigs, work_arr, lwork, error_flag)
-        
+
         case("dandc")     !! Divide & Conquer: fast, higher memory requirement
             if ( allocated(iwork_arr) ) deallocate(iwork_arr)
             allocate( iwork_arr(1) )
@@ -3005,7 +2935,7 @@ subroutine diagonalize_sym_dble_(mode, A, eigs)
             call DSYEVD(mode, "U", n, A, n, eigs, work_arr, lwork, &
                         iwork_arr, liwork, error_flag)
             if ( allocated(iwork_arr) ) deallocate(iwork_arr)
-        
+
         case("mrrr")      !! MRRR algorithm: medium memory requirement
             if ( allocated(isupp) ) deallocate(isupp)
             allocate( isupp(2*n), stat=error_flag)
@@ -3029,7 +2959,7 @@ subroutine diagonalize_sym_dble_(mode, A, eigs)
             deallocate(iwork_arr)
             deallocate(isupp)
             deallocate(vecs)
-    
+
     endselect
     deallocate (work_arr)
     if (error_flag /= 0) then
@@ -3044,10 +2974,10 @@ function diagonalized_sym_dble_(A, eigvecs) result(eigs)
     real(8), intent(in) :: A(:, :)
     real(8), intent(out), optional, target :: eigvecs(size(A, 1), size(A, 2))
     real(8) :: eigs(size(A, 1))
-    
+
     real(8), pointer :: eigvecs_p(:, :)
     character(len=1) :: mode
-    
+
     if (present(eigvecs)) then
         mode = 'V'
         eigvecs_p => eigvecs
@@ -3121,14 +3051,14 @@ subroutine diagonalize_he_cmplx_(mode, A, eigs)
     complex(8), intent(inout) :: A(:, :)
     real(8), intent(out) :: eigs(size(A, 1))
 
-    complex(8), allocatable  :: work(:), vecs(:,:)
-    real(8), allocatable     :: rwork(:)
-    integer, allocatable     :: iwork(:), isupp(:)
+    complex(8), allocatable :: work(:), vecs(:,:)
+    real(8), allocatable :: rwork(:)
+    integer, allocatable :: iwork(:), isupp(:)
     integer :: vl, vu, il, iu, nvals
     integer :: n, lwork, lrwork, liwork
     integer :: error_flag
-    
-    
+
+
     n = size(A, 1)
     if ( allocated(rwork) ) deallocate(rwork)
     if ( allocated(work) ) deallocate(work)
@@ -3143,7 +3073,7 @@ subroutine diagonalize_he_cmplx_(mode, A, eigs)
             allocate( work(lwork) )
             call ZHEEV(mode, "U", n, A, n, eigs, work, lwork, rwork, &
                        error_flag)
-        
+
         case("dandc")     !! Divide & Conquer: fast, high memory consumption
             allocate(work(1))
             allocate(rwork(1))
@@ -3163,7 +3093,7 @@ subroutine diagonalize_he_cmplx_(mode, A, eigs)
             call ZHEEVD(mode, "U", n, A, n, eigs, work, lwork, rwork, &
                         lrwork, iwork, liwork, error_flag)
             deallocate(iwork)
-        
+
         case("mrrr")      !! MRRR algorithm: fast, medium memory consumption
             allocate(work(1))
             allocate(rwork(1))
@@ -3192,7 +3122,7 @@ subroutine diagonalize_he_cmplx_(mode, A, eigs)
             deallocate(iwork)
             deallocate(isupp)
             deallocate(vecs)
-        
+
     endselect
     deallocate(rwork)
     deallocate(work)
@@ -3233,13 +3163,7 @@ subroutine diagonalize_ge_cmplx_(mode, A, eigs)
     A = vectors
 end subroutine
 
-
-
-
-
-
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-
 
 !!!!!!  !!!!!!  !!!!!!!  !!      !!!!!!!  !!!!!!  !!!!!!!  !!!!!!  !!   !!
 !!      !!      !!   !!  !!      !!   !!  !!  !!  !!   !!  !!      !!  !!
@@ -3247,10 +3171,7 @@ end subroutine
     !!  !!      !!   !!  !!      !!   !!  !!      !!   !!  !!      !!  !!
 !!!!!!  !!!!!!  !!   !!  !!!!!!  !!   !!  !!      !!   !!  !!!!!!  !!   !!
 
-
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-
-
 
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !!     vdW(TS) ENERGY     !!
@@ -3269,11 +3190,11 @@ function get_ts_energy_lowmem(mode, version, xyz, C6, alpha_0, R_vdw, &
     !! s_R, d:    damping parameters (for range and steepness)
     !! unit_cell: well, unit cell [a.u.]
     !!!!!!!!!!!!!!!!!
-    
+
     !!!!! RESULT !!!!!
     !! ene:       vdW(TS) dispersion energy [a.u.]
     !!!!!!!!!!!!!!!!!!
-    
+
     !!!!! LOCAL VARIABLES !!!!!
     !! C6_ij:           combined C6 interaction coefficient
     !! r/r_norm:        interatomic distance and corresponding vector
@@ -3288,26 +3209,26 @@ function get_ts_energy_lowmem(mode, version, xyz, C6, alpha_0, R_vdw, &
     !! shell_thickness: range of neighboring cells to be considered
     !! is_X:            flags whether to do/use X
     !!!!!!!!!!!!!!!!!!!!!!!!!!!
-    
-    character(len=*), intent(in)   :: mode, version
-    real(8), intent(in)            :: xyz(:, :), C6(size(xyz, 1)), &
+
+    character(len=*), intent(in) :: mode, version
+    real(8), intent(in) :: xyz(:, :), C6(size(xyz, 1)), &
                                       alpha_0(size(xyz, 1))
-    real(8), intent(in), optional  :: R_vdw(size(xyz, 1)), s_R, d, &
+    real(8), intent(in), optional :: R_vdw(size(xyz, 1)), s_R, d, &
                                       unit_cell(3, 3)
-    
-    real(8)  :: ene
-    
-    real(8)  :: C6_ij, r(3), r_norm, f_damp, R_vdw_ij, ene_shell, &
+
+    real(8) :: ene
+
+    real(8) :: C6_ij, r(3), r_norm, f_damp, R_vdw_ij, ene_shell, &
                 ene_pair, R_cell(3)
-    integer  :: i_shell, i_cell, i_atom, j_atom, range_cell(3), &
+    integer :: i_shell, i_cell, i_atom, j_atom, range_cell(3), &
                 minr_cell(3), idx_cell(3)
     real(8), parameter :: shell_thickness = 10.d0
-    logical  :: is_crystal, is_parallel
-    
-    
+    logical :: is_crystal, is_parallel
+
+
     is_crystal = is_in('C', mode)
     is_parallel = is_in('P', mode)
-    
+
     ene = 0.d0
     i_shell = 0
     do          ! until energy cutoff criterion is reached
@@ -3417,12 +3338,12 @@ subroutine add_dipole_matrix_s(mode, version, xyz, row2glob, col2glob, &
     !! unit_cell: well, unit cell [a.u.]
     !! k_point:   current k-point
     !!!!!!!!!!!!!!!!!
-    
+
     !!!!! RESULT(S) !!!!!
     !! relay:   real dipole-dipole tensor (real-space formalism)
     !! relay_c: complex dipole-dipole tensor (reciprocal-space formalism)
     !!!!!!!!!!!!!!!!!!!!!
-    
+
     !!!!! LOCAL VARIABLES !!!!!
     !! Tpp:               atom-pairwise (3x3) interaction tensor
     !! R_cell:            radius of cell
@@ -3442,33 +3363,33 @@ subroutine add_dipole_matrix_s(mode, version, xyz, row2glob, col2glob, &
     !! range_cell:        range of periodic images included
     !! i, j, i_xyz:       additional loop indices
     !!!!!!!!!!!!!!!!!!!!!!!!!!!
-    
+
     character(len=*), intent(in) :: mode, version
-    real(8), intent(in)  :: xyz(:, :)
-    integer, intent(in)  :: row2glob(:), col2glob(:), do_cmplx, do_real
-    real(8), intent(in), optional  :: alpha(size(xyz, 1))
-    real(8), intent(in), optional  :: R_vdw(size(xyz, 1)), beta, a
-    real(8), intent(in), optional  :: C6(size(xyz, 1)), unit_cell(3, 3)
-    real(8), intent(in), optional  :: k_point(3)
-    real(8), intent(inout), optional     :: &
+    real(8), intent(in) :: xyz(:, :)
+    integer, intent(in) :: row2glob(:), col2glob(:), do_cmplx, do_real
+    real(8), intent(in), optional :: alpha(size(xyz, 1))
+    real(8), intent(in), optional :: R_vdw(size(xyz, 1)), beta, a
+    real(8), intent(in), optional :: C6(size(xyz, 1)), unit_cell(3, 3)
+    real(8), intent(in), optional :: k_point(3)
+    real(8), intent(inout), optional :: &
           relay(do_real*3*size(row2glob), do_real*3*size(col2glob))
-    complex(8), intent(inout), optional  :: &
+    complex(8), intent(inout), optional :: &
           relay_c(do_cmplx*3*size(row2glob), do_cmplx*3*size(col2glob))
-    
-    real(8)  :: Tpp(3, 3), R_cell(3), r(3), r_norm, R_vdw_ij, C6_ij
-    real(8)  :: sigma_ij, volume, ewald_alpha, real_space_cutoff
-    complex(8)  :: Tpp_c(3, 3)
-    integer  :: i_local, j_local, i_atom, j_atom, i_cell, idx_cell(3),&
+
+    real(8) :: Tpp(3, 3), R_cell(3), r(3), r_norm, R_vdw_ij, C6_ij
+    real(8) :: sigma_ij, volume, ewald_alpha, real_space_cutoff
+    complex(8) :: Tpp_c(3, 3)
+    integer :: i_local, j_local, i_atom, j_atom, i_cell, idx_cell(3),&
                 range_cell(3), i, j, i_xyz
-    logical  :: is_crystal, is_reciprocal, is_low_dim, mute, do_ewald
-    
-    
+    logical :: is_crystal, is_reciprocal, is_low_dim, mute, do_ewald
+
+
     is_reciprocal = is_in('R', mode)
     is_crystal = is_in('C', mode) .or. is_reciprocal
     is_low_dim = any(param_vacuum_axis)
     do_ewald = .false.
     mute = is_in('M', mode)
-    
+
     if (is_crystal) then
         if (is_low_dim) then
             real_space_cutoff = param_dipole_low_dim_cutoff
@@ -3504,7 +3425,7 @@ subroutine add_dipole_matrix_s(mode, version, xyz, row2glob, col2glob, &
             do j_local = 1, size(col2glob)
                 j_atom = col2glob(j_local)
                 if ( (i_cell==1) .and. (i_atom==j_atom) ) cycle
-                
+
                 r = xyz(i_atom, :)-xyz(j_atom, :)-R_cell
                 r_norm = norm2(r)
                 if (is_crystal .and. r_norm > real_space_cutoff) cycle
@@ -3547,7 +3468,7 @@ subroutine add_dipole_matrix_s(mode, version, xyz, row2glob, col2glob, &
                             *T_erf_coulomb(r, sigma_ij, 1.d0)
                         do_ewald = .false.
                     case ("erf,dip,gg")
-                        Tpp = (1.d0-damping_erf(r_norm, beta*R_vdw_ij, a)) & 
+                        Tpp = (1.d0-damping_erf(r_norm, beta*R_vdw_ij, a)) &
                             *T_erf_coulomb(r, sigma_ij, 1.d0)
                         do_ewald = .false.
                 endselect
@@ -3576,7 +3497,7 @@ subroutine add_dipole_matrix_s(mode, version, xyz, row2glob, col2glob, &
                                  row2glob, col2glob, do_cmplx, do_real,&
                                  k_point, relay, relay_c)
     endif
-    
+
 end subroutine add_dipole_matrix_s
 
 
@@ -3616,31 +3537,31 @@ subroutine add_ewald_dipole_parts_s(mode, xyz, unit_cell, alpha, &
     !! range_G_vector:    range of lattice (G) vectors included
     !! i, j, i/j_xyz:     additional loop indices
     !!!!!!!!!!!!!!!!!!!!!!!!!!!
-    
-    character(len=*), intent(in)   :: mode
-    real(8), intent(in)            :: xyz(:, :), unit_cell(3, 3), &
+
+    character(len=*), intent(in) :: mode
+    real(8), intent(in) :: xyz(:, :), unit_cell(3, 3), &
                                       alpha
-    integer, intent(in)            :: row2glob(:), col2glob(:), &
+    integer, intent(in) :: row2glob(:), col2glob(:), &
                                       do_cmplx, do_real
-    real(8), intent(in), optional  :: k_point(3)
-    
-    real(8), intent(inout), optional     :: &
+    real(8), intent(in), optional :: k_point(3)
+
+    real(8), intent(inout), optional :: &
           relay(do_real*3*size(row2glob), do_real*3*size(col2glob))
-    complex(8), intent(inout), optional  :: &
+    complex(8), intent(inout), optional :: &
           relay_c(do_cmplx*3*size(row2glob), do_cmplx*3*size(col2glob))
-    
-    logical     :: is_reciprocal, mute, do_surface
-    real(8)     :: rec_unit_cell(3, 3), volume, G_vector(3), r(3), &
+
+    logical :: is_reciprocal, mute, do_surface
+    real(8) :: rec_unit_cell(3, 3), volume, G_vector(3), r(3), &
                    k_total(3), k_sq, rec_space_cutoff, Tpp(3, 3), &
                    k_prefactor(3, 3), elem
-    complex(8)  :: Tpp_c(3, 3)
-    integer     :: i_local, j_local, i_atom, j_atom, i, j, i_xyz, &
+    complex(8) :: Tpp_c(3, 3)
+    integer :: i_local, j_local, i_atom, j_atom, i, j, i_xyz, &
                    j_xyz, idx_G_vector(3), i_G_vector, range_G_vector(3)
-    
-    
+
+
     is_reciprocal = is_in('R', mode)
     mute = is_in('M', mode)
-    
+
     rec_unit_cell = 2*pi*inverted(transpose(unit_cell))
     volume = abs(dble(product(diagonalized(unit_cell))))
     rec_space_cutoff = 10.d0*alpha*param_ewald_rec_cutoff_scaling
@@ -3772,16 +3693,16 @@ function run_scs_s(mode, version, xyz, alpha, R_vdw, beta, a,unit_cell)&
     !! a:         damping factor for dipole-dipole coupling?
     !! unit_cell: well, unit cell [a.u]
     !!!!!!!!!!!!!!!!!
-    
+
     !!!!! RESULT !!!!!
     !! alpha_scs: frequency-dependent, isotropic atomic polarizabilities
     !!!!!!!!!!!!!!!!!!
-    
+
     !!!!! LOCAL VARIABLES !!!!!
     !! i_grid_omega: loop index for frequencies
     !! mute:         print messages during calculation?
     !!!!!!!!!!!!!!!!!!!!!!!!!!!
-    
+
     character(len=*), intent(in) :: mode, version
     real(8), intent(in) :: &
         xyz(:, :), &
@@ -3791,17 +3712,17 @@ function run_scs_s(mode, version, xyz, alpha, R_vdw, beta, a,unit_cell)&
         beta, a, &
         unit_cell(3, 3)
     real(8), dimension(size(alpha, 1), size(alpha, 2)) :: alpha_scs
-    
+
     integer :: i_grid_omega
     character(len=1) :: mute
-    
-    
+
+
     if (is_in('M', mode)) then
         mute = 'M'
     else
         mute = ''
     endif
-    
+
     alpha_scs(:, :) = 0.d0
     !! for each frequency: run screening
     do i_grid_omega = 0, n_grid_omega
@@ -3814,10 +3735,10 @@ function run_scs_s(mode, version, xyz, alpha, R_vdw, beta, a,unit_cell)&
                      beta=beta, &
                      a=a, &
                      unit_cell=unit_cell)
-        
+
         mute = 'M'
     enddo
-    
+
 end function run_scs_s
 
 
@@ -3833,11 +3754,11 @@ function do_scs_s(mode, version, xyz, alpha, R_vdw, beta, a, &
     !! a:             damping factor for dipole-dipole interaction
     !! lam:           scaling factor of bare dipole-dipole tensor
     !!!!!!!!!!!!!!!!!!
-    
+
     !!!!! RESULT !!!!!
     !! alpha_scs_i:   screened, isotropic atomic polarizabilities
     !!!!!!!!!!!!!!!!!!
-    
+
     !!!!! PRIVATE VARIABLES !!!!!
     !! n_tasks_bak:   back-up for number of MPI-tasks (= number of cores)
     !! size1n:        number of atoms
@@ -3875,51 +3796,51 @@ function do_scs_s(mode, version, xyz, alpha, R_vdw, beta, a, &
     !! alpha_3_3:     (3x3) screened anisotropic atomic polarizability
     !! alpha_diag:    eigenvalues of alpha_3_3 (mean = isotropic alpha)
     !!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-    
-    character(len=*), intent(in)   :: mode, version
-    real(8), intent(in)            :: xyz(:, :), alpha(:)
-    real(8), intent(in), optional  :: R_vdw(size(xyz, 1))
-    real(8), intent(in), optional  :: beta, a, unit_cell(3, 3), lam
-    real(8)  :: alpha_scs_i(size(xyz, 1))
-    logical  :: scale_lambda
-    integer  :: n_tasks_bak, size1n, size3n, my_task_blacs, n_tasks_blacs
-    integer  :: scs_ctxt, nprows, npcols, my_prow, my_pcol, fb3n, fb1n
-    integer  :: my_nrows3n, my_nrows1n, my_ncols3n, my_ncols1n, numroc
-    integer, dimension(9)  :: desc3n3n, desc1n
-    integer, dimension(:), allocatable  :: my_row2glob, my_col2glob
-    integer  :: i_local, i_atom, i, i_xyz, j_local, j_atom, j, j_xyz
-    integer  :: ierr, my_scs_lwork, my_scs_liwork
-    real(8), dimension(:,:), allocatable  :: my_alphafull
-    real(8), dimension(:), allocatable    :: my_scs_work
-    integer, dimension(:), allocatable    :: my_ipiv, my_scs_iwork
-    real(8), dimension(:,:), allocatable  :: my_alphascs
-    real(8)  :: alpha_3_3(3,3), alpha_diag(3)
-    
-    
+
+    character(len=*), intent(in) :: mode, version
+    real(8), intent(in) :: xyz(:, :), alpha(:)
+    real(8), intent(in), optional :: R_vdw(size(xyz, 1))
+    real(8), intent(in), optional :: beta, a, unit_cell(3, 3), lam
+    real(8) :: alpha_scs_i(size(xyz, 1))
+    logical :: scale_lambda
+    integer :: n_tasks_bak, size1n, size3n, my_task_blacs, n_tasks_blacs
+    integer :: scs_ctxt, nprows, npcols, my_prow, my_pcol, fb3n, fb1n
+    integer :: my_nrows3n, my_nrows1n, my_ncols3n, my_ncols1n, numroc
+    integer, dimension(9) :: desc3n3n, desc1n
+    integer, dimension(:), allocatable :: my_row2glob, my_col2glob
+    integer :: i_local, i_atom, i, i_xyz, j_local, j_atom, j, j_xyz
+    integer :: ierr, my_scs_lwork, my_scs_liwork
+    real(8), dimension(:,:), allocatable :: my_alphafull
+    real(8), dimension(:), allocatable :: my_scs_work
+    integer, dimension(:), allocatable :: my_ipiv, my_scs_iwork
+    real(8), dimension(:,:), allocatable :: my_alphascs
+    real(8) :: alpha_3_3(3,3), alpha_diag(3)
+
+
     !! should I scale bare dipole-dipole tensor?
     scale_lambda = is_in('L', mode)
-    
+
     !!!!!  BACKUP NTASKS, DEFINE GLOBAL ARRAY SIZES  !!!!!
     n_tasks_bak = n_tasks
     n_tasks = 1
     size1n = size(xyz,1)
     size3n = 3*size1n
-    
-    
+
+
     !!!!!  BLACS INITIALIZATION  !!!!!
     !! get current processor and total number of processors
     call BLACS_PINFO(my_task_blacs, n_tasks_blacs)
-    
+
     !! build square processor grid from available processors
     do nprows = int(  sqrt( dble(n_tasks_blacs) )  ), 1, -1
         if (mod(n_tasks_blacs, nprows) == 0) exit
     enddo
     npcols = n_tasks_blacs/nprows
-    
+
     call BLACS_GET(0, 0, scs_ctxt)
     call BLACS_GRIDINIT(scs_ctxt, 'R', nprows, npcols)
     call BLACS_GRIDINFO(scs_ctxt, nprows, npcols, my_prow, my_pcol)
-    
+
     !! block sizes, local shapes for (3n by 3n) and (n by n) matrices
     !! fb3n can be adjusted for performance (assert: mod(fb3n, 3) = 0)
     fb3n = 3
@@ -3928,14 +3849,14 @@ function do_scs_s(mode, version, xyz, alpha, R_vdw, beta, a, &
     my_nrows1n = max(1, numroc(size1n, fb1n, my_prow, 0, nprows))
     my_ncols3n = max(1, numroc(size3n, fb3n, my_pcol, 0, npcols))
     my_ncols1n = max(1, numroc(size1n, fb1n, my_pcol, 0, npcols))
-    
+
     !! BLACS descriptors
     call descinit(desc3n3n, size3n, size3n, fb3n, fb3n, 0,0,scs_ctxt, &
                   my_nrows3n, ierr)
     call descinit(desc1n, size1n, 1, fb1n, 1, 0, 0, scs_ctxt, &
                   my_nrows1n, ierr)
-    
-    
+
+
     !!!!!  GET ATOM MAPPINGS  !!!!!
     if ( allocated(my_row2glob) ) deallocate(my_row2glob)
     allocate( my_row2glob(my_nrows1n), stat=ierr)
@@ -3950,13 +3871,13 @@ function do_scs_s(mode, version, xyz, alpha, R_vdw, beta, a, &
          my_col2glob(i_local) = map_local2global(i_local, npcols, &
                                                  fb1n, my_pcol, 0)
     enddo
-    
-    
+
+
     !!!!!  BUILD (LOCAL) DIPOLE-DIPOLE (SUB)TENSOR  !!!!!
     if ( allocated(my_alphafull) ) deallocate(my_alphafull)
     allocate( my_alphafull(my_nrows3n, my_ncols3n), stat=ierr)
     my_alphafull(:, :) = 0.d0
-    
+
     call add_dipole_matrix_s(blanked('R', mode), &
                              version, &
                              xyz=xyz, &
@@ -3969,7 +3890,7 @@ function do_scs_s(mode, version, xyz, alpha, R_vdw, beta, a, &
                              a=a, &
                              unit_cell=unit_cell, &
                              relay=my_alphafull)
-    
+
     if (scale_lambda) then
         my_alphafull = lam*my_alphafull
     endif
@@ -3990,17 +3911,17 @@ function do_scs_s(mode, version, xyz, alpha, R_vdw, beta, a, &
             endif
         enddo ! j_local
     enddo ! j_local
-    
-    
+
+
     !!!!!  INVERT (LOCAL) DIPOLE-DIPOLE (SUB)TENSOR  !!!!!
     call ts(31)
-    
+
     !! step 1: L/U decomposition
     if ( allocated(my_ipiv) ) deallocate(my_ipiv)
     allocate( my_ipiv(size3n) , stat=ierr)
     call PDGETRF(size3n, size3n, my_alphafull, 1, 1, desc3n3n, &
                  my_ipiv, ierr)
-    
+
     !! step 2a: work space query for inversion
     if ( allocated(my_scs_work) ) deallocate(my_scs_work)
     allocate(my_scs_work(1), stat=ierr)
@@ -4008,7 +3929,7 @@ function do_scs_s(mode, version, xyz, alpha, R_vdw, beta, a, &
     allocate(my_scs_iwork(1), stat=ierr)
     call PDGETRI(size3n, my_alphafull, 1, 1, desc3n3n, my_ipiv, &
                  my_scs_work, -1, my_scs_iwork, -1, ierr)
-    
+
     !! step 2b: actual inversion
     my_scs_lwork = nint(my_scs_work(1))
     my_scs_liwork = int(my_scs_iwork(1))
@@ -4019,13 +3940,13 @@ function do_scs_s(mode, version, xyz, alpha, R_vdw, beta, a, &
     call PDGETRI(size3n, my_alphafull, 1, 1, desc3n3n, my_ipiv, &
                 my_scs_work, my_scs_lwork, my_scs_iwork, my_scs_liwork,&
                 ierr)
-    
-    
+
+
     !!!!!  CONTRACT ATOMIC POLARIZABILITIES  !!!!!
     !!
     !! (diagonalized) SCS-tensor is composed of NxN atomic 3x3 submatrices.
     !! Thus, in terms of SCS-tensor elements ij(AtomA,AtomB):
-    !! 
+    !!
     !!  / xx(1,1) xy(1,1) xz(1,1)   xx(1,2) xy(1,2) xz(1,2)   xx(1,3) ... \
     !!  | yx(1,1) yy(1,1) yz(1,1)   yx(1,2) yy(1,2) yz(1,2)   yx(1,3) ... |
     !!  | zx(1,1) zy(1,1) zz(1,1)   zx(1,2) zy(1,2) zz(1,2)   zx(1,3) ... |
@@ -4037,16 +3958,16 @@ function do_scs_s(mode, version, xyz, alpha, R_vdw, beta, a, &
     !! step 1: ij element of the (3x3) screened anisotropic polarizability
     !! for atom iAtom is given by sum of all elements ij(iAtom,jAtom) ,
     !! where ij \in {xx, xy, xz, yx, yy, yz, zx, zy, zz}
-    !! 
+    !!
     !! step 2: contracted isotropic polarizability is given by the sum of
     !! eigenvalues of the (3x3) anisotropic atomic polarizability tensor.
     !!
     !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-    
+
     if ( allocated(my_alphascs) ) deallocate(my_alphascs)
     allocate( my_alphascs(my_nrows1n,1), stat=ierr)
     my_alphascs(:,1) = 0.d0
-    
+
     do i_local = 1, my_nrows1n
         alpha_3_3(:,:) = 0.d0
         !! sum over contributions of all atoms (columns) in LOCAL (sub)array
@@ -4057,27 +3978,27 @@ function do_scs_s(mode, version, xyz, alpha, R_vdw, beta, a, &
                              sum( my_alphafull(i, j_xyz:my_ncols3n:3) )
             enddo
         enddo
-        
+
         !! -> each process has one (3x3) matrix, which corresponds to the
         !! anisotropic polarizability of atom iAtom including screening
         !! by all atoms contained in LOCAL submatrix
         !! next: sum all anisotropic alpha_3_3 and communicate
         call DGSUM2D(scs_ctxt, 'R', ' ', 3, 3, alpha_3_3, 3, my_prow, -1)
-        
+
         !! now on all columns of the processor grid:
         !! anisotropic alpha of atom i_atom including screening by ALL atoms
         !! next: diagonalize anisotropic alpha to get isotropic alpha
         call diagonalize_sym_dble_('N', alpha_3_3, alpha_diag)
         my_alphascs(i_local,1) = sum(alpha_diag)/3.d0
     enddo
-    
-    
+
+
     !! gather isotropic atomic polarizabilities into results array
     do i_atom=1, size1n
         call pdelget('A',' ', alpha_scs_i(i_atom), my_alphascs, &
                      i_atom, 1, desc1n)
     enddo
-    
+
     !!!!!  DEALLOCATIONS  !!!!!
     if ( allocated(my_alphafull) ) deallocate(my_alphafull)
     if ( allocated(my_row2glob) ) deallocate(my_row2glob)
@@ -4086,12 +4007,12 @@ function do_scs_s(mode, version, xyz, alpha, R_vdw, beta, a, &
     if ( allocated(my_scs_iwork) ) deallocate(my_scs_iwork)
     if ( allocated(my_ipiv) ) deallocate(my_ipiv)
     if ( allocated(my_alphascs) ) deallocate(my_alphascs)
-    
+
     !!!!!  RESTORE NTASKS AND FINISH UP  !!!!!
     n_tasks = n_tasks_bak
     call ts(-31)
     call BLACS_GRIDEXIT(scs_ctxt)
-    
+
 end function do_scs_s
 
 
@@ -4124,28 +4045,28 @@ function get_mbd_energy_s(mode, version, xyz, alpha_0, omega, supercell, &
     !! a:         damping factor for dipole-dipole interaction
     !! C6:        (rescaled and screened) C6 coefficients
     !!!!!!!!!!!!!!!!!
-    
+
     !!!!! RESULT !!!!!
     !! ene : MBD energy [a.u.]
     !!!!!!!!!!!!!!!!!!
-    
+
     !!!!! LOCAL VARIABLES !!!!!
     !! is_X:    flags wheter to do/use X (see mode)
     !!!!!!!!!!!!!!!!!!!!!!!!!!!
-    
-    character(len=*), intent(in)   :: mode, version
-    real(8), intent(in)            :: xyz(:, :), alpha_0(size(xyz, 1)),&
+
+    character(len=*), intent(in) :: mode, version
+    real(8), intent(in) :: xyz(:, :), alpha_0(size(xyz, 1)),&
                                       omega(size(xyz, 1))
-    integer, intent(in), optional  :: supercell(3)
-    real(8), intent(in), optional  :: k_grid(:, :), unit_cell(3, 3), &
+    integer, intent(in), optional :: supercell(3)
+    real(8), intent(in), optional :: k_grid(:, :), unit_cell(3, 3), &
                                       R_vdw(size(xyz, 1)), beta, a, &
                                       C6(size(xyz, 1))
-    
-    real(8)  :: ene
-    
-    logical  :: is_reciprocal, is_crystal, is_parallel
-    
-    
+
+    real(8) :: ene
+
+    logical :: is_reciprocal, is_crystal, is_parallel
+
+
     is_parallel = is_in('P', mode)
     is_crystal = is_in('C', mode)
     is_reciprocal = is_in('R', mode)
@@ -4163,7 +4084,7 @@ function get_mbd_energy_s(mode, version, xyz, alpha_0, omega, supercell, &
     endselect
     call print_log('---------------------------------------------------&
                    &------------')
-    
+
     if (.not. is_crystal) then
         ene = get_single_mbd_energy_s(blanked('R',mode), version, xyz, &
                                alpha_0, omega, R_vdw=R_vdw, beta=beta, &
@@ -4203,11 +4124,11 @@ function get_supercell_mbd_energy_s(mode, version, xyz, alpha_0, omega, &
     !! a:         damping factor for dipole-dipole interaction
     !! C6:        (rescaled and screened) C6 coefficients
     !!!!!!!!!!!!!!!!!
-    
+
     !!!!! RESULT !!!!!
     !! ene : MBD energy [a.u.]
     !!!!!!!!!!!!!!!!!!
-    
+
     !!!!! LOCAL VARIABLES !!!!!
     !! R_cell:  radii of current supercell [a.u.]
     !! i_atom:  loop index over atoms
@@ -4215,24 +4136,24 @@ function get_supercell_mbd_energy_s(mode, version, xyz, alpha_0, omega, &
     !! is_X:    flags wheter to do/use X (see mode)
     !! alpha:   frequenct-dependent isotropic atomic polarizabilities (for RPA)
     !!!!!!!!!!!!!!!!!!!!!!!!!!!
-    
-    character(len=*), intent(in)   :: mode, version
-    real(8), intent(in)            :: xyz(:, :), alpha_0(size(xyz, 1)),&
+
+    character(len=*), intent(in) :: mode, version
+    real(8), intent(in) :: xyz(:, :), alpha_0(size(xyz, 1)),&
                                       omega(size(xyz, 1)), unit_cell(3, 3)
-    integer, intent(in)            :: supercell(3)
-    real(8), intent(in), optional  :: R_vdw(size(xyz, 1)), beta, a, &
+    integer, intent(in) :: supercell(3)
+    real(8), intent(in), optional :: R_vdw(size(xyz, 1)), beta, a, &
                                       C6(size(xyz, 1))
-    
-    real(8)               :: ene
-    
-    real(8)               :: R_cell(3)
-    integer               :: i_atom, i, i_cell, idx_cell(3), n_cells
-    
-    real(8), allocatable  :: xyz_super(:, :), alpha_0_super(:), &
+
+    real(8) :: ene
+
+    real(8) :: R_cell(3)
+    integer :: i_atom, i, i_cell, idx_cell(3), n_cells
+
+    real(8), allocatable :: xyz_super(:, :), alpha_0_super(:), &
                              omega_super(:), R_vdw_super(:), C6_super(:)
-    real(8)               :: unit_cell_super(3, 3)
-    
-    
+    real(8) :: unit_cell_super(3, 3)
+
+
     n_cells = product(supercell)
     !! build supercell
     do i = 1, 3
@@ -4271,16 +4192,16 @@ function get_supercell_mbd_energy_s(mode, version, xyz, alpha_0, omega, &
                                   a=a, &
                                   C6=C6_super, &
                                   unit_cell=unit_cell_super)
-    
+
     deallocate (xyz_super)
     deallocate (alpha_0_super)
     deallocate (omega_super)
     deallocate (R_vdw_super)
     deallocate (C6_super)
-    
+
     !! correct energy down to one unit cell
     ene = ene/n_cells
-    
+
 end function get_supercell_mbd_energy_s
 
 
@@ -4303,11 +4224,11 @@ function get_single_mbd_energy_s(mode, version, xyz, alpha_0, omega, &
     !! C6:        (rescaled) C6 coefficients
     !! unit_cell: well, unit cell [a.u.]
     !!!!!!!!!!!!!!!!!
-    
+
     !!!!! RESULT(S) !!!!!
     !! ene: MBD energy [a.u.]
     !!!!!!!!!!!!!!!!!!!!!
-    
+
     !!!!! LOCAL VARIABLES !!!!!
     !! my_relay:       local subarray of interaction tensor
     !! my_evecs:       local subarray of diagonalized tensor (eigenvectors)
@@ -4341,41 +4262,41 @@ function get_single_mbd_energy_s(mode, version, xyz, alpha_0, omega, &
     !! i/j:            additional (auxiliary) loop indices
     !! ierr:           error status
     !!!!!!!!!!!!!!!!!!!!!!!!!!!
-    
-    character(len=*), intent(in)   :: mode, version
-    real(8), intent(in)            :: xyz(:, :), alpha_0(size(xyz, 1)),&
+
+    character(len=*), intent(in) :: mode, version
+    real(8), intent(in) :: xyz(:, :), alpha_0(size(xyz, 1)),&
                                       omega(size(xyz, 1))
-    real(8), intent(in), optional  :: R_vdw(size(xyz, 1)), beta, a, &
+    real(8), intent(in), optional :: R_vdw(size(xyz, 1)), beta, a, &
                                       C6(size(xyz, 1)), unit_cell(3, 3)
-    
+
     real(8) :: ene
-        
-    real(8), dimension(:,:), allocatable  :: my_relay, my_evecs
-    real(8), dimension(:), allocatable    :: my_cfdm_work, my_write_work
-    integer, dimension(:), allocatable    :: my_row2glob, my_col2glob
-    integer, dimension(:), allocatable    :: my_cfdm_iwork
-    integer  :: vl, vu, il, iu, nvals, nvecs
-    integer  :: n_tasks_bak, size1n, size3n, my_task_blacs
-    integer  :: cfdm_ctxt, nprows, npcols, my_prow, my_pcol, fb3n, fb1n
-    integer  :: my_nrows3n, my_nrows1n, my_ncols3n, my_ncols1n, numroc
+
+    real(8), dimension(:,:), allocatable :: my_relay, my_evecs
+    real(8), dimension(:), allocatable :: my_cfdm_work, my_write_work
+    integer, dimension(:), allocatable :: my_row2glob, my_col2glob
+    integer, dimension(:), allocatable :: my_cfdm_iwork
+    integer :: vl, vu, il, iu, nvals, nvecs
+    integer :: n_tasks_bak, size1n, size3n, my_task_blacs
+    integer :: cfdm_ctxt, nprows, npcols, my_prow, my_pcol, fb3n, fb1n
+    integer :: my_nrows3n, my_nrows1n, my_ncols3n, my_ncols1n, numroc
     integer, dimension(9) :: desc3n3n, desc1n
-    integer  :: my_cfdm_lwork, my_cfdm_liwork, n_tasks_blacs
-    
-    real(8)  :: eigs(3*size(xyz, 1))
-    integer  :: i_local, j_local, i_atom, j_atom, i_xyz, i, j
-    integer  :: n_negative_eigs, ierr
-    logical  :: get_eigenvalues, get_eigenvectors, io_proc
-    
-    
+    integer :: my_cfdm_lwork, my_cfdm_liwork, n_tasks_blacs
+
+    real(8) :: eigs(3*size(xyz, 1))
+    integer :: i_local, j_local, i_atom, j_atom, i_xyz, i, j
+    integer :: n_negative_eigs, ierr
+    logical :: get_eigenvalues, get_eigenvectors, io_proc
+
+
     get_eigenvalues = is_in('E', mode)
     get_eigenvectors = is_in('V', mode)
-    
+
     n_tasks_bak = n_tasks
     n_tasks = 1
-    
+
     size1n = size(xyz,1)
     size3n = 3*size1n
-    
+
     !! blacs context, grid info, ...
     call BLACS_PINFO(my_task_blacs, n_tasks_blacs)
     do nprows = int(  sqrt( dble(n_tasks_blacs) )  ), 1, -1
@@ -4386,29 +4307,29 @@ function get_single_mbd_energy_s(mode, version, xyz, alpha_0, omega, &
     call BLACS_GRIDINIT(cfdm_ctxt, 'R', nprows, npcols)
     call BLACS_GRIDINFO(cfdm_ctxt, nprows, npcols, my_prow, my_pcol)
     io_proc = ( (my_prow==0) .and. (my_pcol==0) )
-    
+
     !! block sizes, local shapes for (3n by 3n) and (n by n) matrices
     !! fb3n can be adjusted for performance (assert: mod(fb3n, 3) = 0)
     fb3n = 3
-    
+
     fb1n = fb3n/3
     my_nrows3n = max(1, numroc(size3n, fb3n, my_prow, 0, nprows))
     my_nrows1n = max(1, numroc(size1n, fb1n, my_prow, 0, nprows))
     my_ncols3n = max(1, numroc(size3n, fb3n, my_pcol, 0, npcols))
     my_ncols1n = max(1, numroc(size1n, fb1n, my_pcol, 0, npcols))
-    
+
     !! blacs descriptors
     call descinit(desc3n3n, size3n, size3n, fb3n, fb3n,0,0,cfdm_ctxt,&
                   my_nrows3n, ierr)
-    
+
     call descinit(desc1n, size1n, 1, fb1n, 1, 0, 0, cfdm_ctxt, &
                   my_nrows1n, ierr)
-    
+
     if ( allocated(my_row2glob) ) deallocate(my_row2glob)
     allocate( my_row2glob(my_nrows1n), stat=ierr)
     if ( allocated(my_col2glob) ) deallocate(my_col2glob)
     allocate( my_col2glob(my_ncols1n), stat=ierr)
-    
+
     !! build my_row(col)2glob (and my_diagidx TODO)
     do i_atom=1, my_nrows1n
          my_row2glob(i_atom) = map_local2global(i_atom, nprows, fb1n, &
@@ -4420,7 +4341,7 @@ function get_single_mbd_energy_s(mode, version, xyz, alpha_0, omega, &
     enddo
     if ( allocated(my_relay) ) deallocate(my_relay)
     allocate( my_relay(my_nrows3n, my_ncols3n), stat=ierr)
-    
+
     my_relay(:, :) = 0.d0
     call add_dipole_matrix_s(mode, &
                              version, &
@@ -4435,7 +4356,7 @@ function get_single_mbd_energy_s(mode, version, xyz, alpha_0, omega, &
                              C6=C6, &
                              unit_cell=unit_cell, &
                              relay=my_relay)
-    
+
     do i_local = 1, size(my_row2glob)
         i_atom = my_row2glob(i_local)
         do j_local = 1, size(my_col2glob)
@@ -4446,7 +4367,7 @@ function get_single_mbd_energy_s(mode, version, xyz, alpha_0, omega, &
                 omega(i_atom)*omega(j_atom) &
                 *sqrt(alpha_0(i_atom)*alpha_0(j_atom))* &
                 my_relay(i:i+2, j:j+2)
-            
+
             if (i_atom == j_atom) then
                 do i_xyz = 1, 3
                     i = 3*i_local-3 + i_xyz
@@ -4461,12 +4382,12 @@ function get_single_mbd_energy_s(mode, version, xyz, alpha_0, omega, &
     call ts(21)
     if ( allocated(my_cfdm_work) ) deallocate(my_cfdm_work)
     allocate(my_cfdm_work(1))
-    
+
     if (get_eigenvectors) then
         !! allocate local array of eigenvectors
         if ( allocated(my_evecs) ) deallocate(my_evecs)
         allocate( my_evecs(my_nrows3n, my_ncols3n), stat=ierr)
-        
+
         selectcase(trim(eigensolver))
             case("qr")        !! QR algorithm (slow, minimum memory)
                 call PDSYEV('V', 'U', size3n, my_relay, 1, 1, desc3n3n, &
@@ -4478,7 +4399,7 @@ function get_single_mbd_energy_s(mode, version, xyz, alpha_0, omega, &
                 call PDSYEV('V', 'U', size3n, my_relay, 1, 1, desc3n3n, &
                             eigs, my_evecs, 1, 1, desc3n3n, my_cfdm_work, &
                             my_cfdm_lwork, ierr)
-            
+
             case("dandc")     !! Divide & Conquer (fast, large memory)
                 if ( allocated(my_cfdm_iwork) ) deallocate(my_cfdm_iwork)
                 allocate( my_cfdm_iwork(1), stat=ierr )
@@ -4496,7 +4417,7 @@ function get_single_mbd_energy_s(mode, version, xyz, alpha_0, omega, &
                              my_cfdm_lwork, my_cfdm_iwork, my_cfdm_liwork, &
                              ierr)
                 if ( allocated(my_cfdm_iwork) ) deallocate(my_cfdm_iwork)
-            
+
             case("mrrr")      !! MRRR algorithm (fast, low memory)
                 if ( allocated(my_cfdm_iwork) ) deallocate(my_cfdm_iwork)
                 allocate( my_cfdm_iwork(1), stat=ierr )
@@ -4517,14 +4438,14 @@ function get_single_mbd_energy_s(mode, version, xyz, alpha_0, omega, &
                              ierr)
                 if ( allocated(my_cfdm_iwork) ) deallocate(my_cfdm_iwork)
         endselect
-        
+
         !! write eigenvectors to output file
         if (allocated(my_write_work)) deallocate(my_write_work)
         allocate(my_write_work(fb3n), stat=ierr)
         call PDWRITEEIGVEC('mbd_eigenmodes.out', size3n, size3n, my_evecs, &
                           1, 1, desc3n3n, 0, 0, my_write_work)
         deallocate(my_write_work)
-    
+
     else
         selectcase(trim(eigensolver))
             case("qr")
@@ -4541,12 +4462,12 @@ function get_single_mbd_energy_s(mode, version, xyz, alpha_0, omega, &
                 call PDSYEV('N', 'U', size3n, my_relay, 1, 1, desc3n3n, &
                             eigs, my_evecs, 1, 1, desc3n3n, my_cfdm_work, &
                             my_cfdm_lwork, ierr)
-                
+
             case("dandc")
                 !! only eigenvalues not implemented in PDSYEVD yet
                 if ( allocated(my_evecs) ) deallocate(my_evecs)
                 allocate( my_evecs(my_nrows3n, my_ncols3n), stat=ierr )
-                
+
                 !! work space query (for Divide & Conquer algorithm)
                 if ( allocated(my_cfdm_iwork) ) deallocate(my_cfdm_iwork)
                 allocate( my_cfdm_iwork(1), stat=ierr )
@@ -4564,7 +4485,7 @@ function get_single_mbd_energy_s(mode, version, xyz, alpha_0, omega, &
                              my_cfdm_lwork, my_cfdm_iwork, my_cfdm_liwork, &
                              ierr)
                 deallocate(my_cfdm_iwork)
-            
+
             case("mrrr")
                 !! allocate dummy for eigenvectors
                 if ( allocated(my_evecs) ) deallocate(my_evecs)
@@ -4597,7 +4518,7 @@ function get_single_mbd_energy_s(mode, version, xyz, alpha_0, omega, &
     deallocate(my_col2glob)
     deallocate(my_relay, stat=ierr)
     call ts(-21)
-    
+
     n_negative_eigs = count(eigs(:) < 0)
     if (n_negative_eigs > 0) then
         call print_warning( &
@@ -4606,19 +4527,19 @@ function get_single_mbd_energy_s(mode, version, xyz, alpha_0, omega, &
         )
         if (param_zero_negative_eigs) where (eigs < 0) eigs = 0.d0
     endif
-    
+
     ene = 1.d0/2*sum(sqrt(eigs))-3.d0/2*sum(omega)
-    
+
     if (get_eigenvalues) then
         where (eigs < 0) eigs = 0.d0
         eigs = sqrt(eigs)
         if (io_proc) call write_eigenenergies(eigs, "mbd_eigenenergies.out")
     endif
-    
+
     ! destroy blacs grid, restore n_tasks
     call BLACS_GRIDEXIT(cfdm_ctxt)
     n_tasks = n_tasks_bak
-    
+
 end function get_single_mbd_energy_s
 
 
@@ -4641,37 +4562,37 @@ function get_reciprocal_mbd_energy_s(mode, version, xyz,alpha_0, &
     !! a:         damping factor for dipole-dipole coupling
     !! C6:        (rescaled and screened) C6 coefficients
     !!!!!!!!!!!!!!!!!
-    
+
     !!!!! RESULT !!!!!
     !! ene:       MBD energy [a.u.]
     !!!!!!!!!!!!!!!!!!
-    
+
     !!!!! LOCAL VARIABLES !!!!!
     !! i_kpt:     loop index for k-point grid
     !! k_point:   current k-point
     !! mute:      print messages during calculation?
     !!!!!!!!!!!!!!!!!!!!!!!!!!!
-    
-    character(len=*), intent(in)   :: mode, version
-    real(8), intent(in)            :: xyz(:, :), alpha_0(size(xyz, 1))
-    real(8), intent(in)            :: omega(size(xyz, 1)), &
+
+    character(len=*), intent(in) :: mode, version
+    real(8), intent(in) :: xyz(:, :), alpha_0(size(xyz, 1))
+    real(8), intent(in) :: omega(size(xyz, 1)), &
                                       k_grid(:, :), unit_cell(3, 3)
-    real(8), intent(in), optional  :: R_vdw(size(xyz, 1)), beta, a
-    real(8), intent(in), optional  :: C6(size(xyz, 1))
-    
-    real(8)           :: ene
-    
-    integer           :: i_kpt
-    real(8)           :: k_point(3)
-    character(len=1)  :: mute
-    
-    
+    real(8), intent(in), optional :: R_vdw(size(xyz, 1)), beta, a
+    real(8), intent(in), optional :: C6(size(xyz, 1))
+
+    real(8) :: ene
+
+    integer :: i_kpt
+    real(8) :: k_point(3)
+    character(len=1) :: mute
+
+
     if (is_in('M', mode)) then
         mute = 'M'
     else
         mute = ''
     endif
-    
+
     ene = 0.d0
     do i_kpt = 1, size(k_grid, 1)
         k_point = k_grid(i_kpt, :)
@@ -4688,11 +4609,11 @@ function get_reciprocal_mbd_energy_s(mode, version, xyz,alpha_0, &
                          beta=beta, &
                          a=a, &
                          C6=C6)
-        
+
         mute = 'M'
     enddo ! k_point loop
     ene = ene/size(k_grid, 1)
-    
+
 end function get_reciprocal_mbd_energy_s
 
 
@@ -4758,38 +4679,38 @@ function get_single_reciprocal_mbd_ene_s(mode, version, xyz, alpha_0, &
     !! i/j:            additional (auxiliary) loop indices
     !! ierr:           error status
     !!!!!!!!!!!!!!!!!!!!!!!!!!!
-    
-    character(len=*), intent(in)   :: mode, version
-    real(8), intent(in)            :: xyz(:, :), alpha_0(size(xyz, 1)),&
+
+    character(len=*), intent(in) :: mode, version
+    real(8), intent(in) :: xyz(:, :), alpha_0(size(xyz, 1)),&
                                       omega(size(xyz, 1)), k_point(3), &
                                       unit_cell(3, 3)
-    integer, intent(in), optional  :: i_kpt
-    real(8), intent(in), optional  :: R_vdw(size(xyz, 1)), beta, a, &
+    integer, intent(in), optional :: i_kpt
+    real(8), intent(in), optional :: R_vdw(size(xyz, 1)), beta, a, &
                                       C6(size(xyz, 1))
-    
+
     real(8) :: ene
-    
-    complex(8), dimension(:,:), allocatable  :: my_relay, my_evecs
-    complex(8), dimension(:), allocatable    :: my_cfdm_work
-    complex(8), dimension(:), allocatable    :: my_write_work
-    real(8), dimension(:), allocatable       :: my_cfdm_rwork
-    integer, dimension(:), allocatable       :: my_row2glob, my_col2glob
-    integer, dimension(:), allocatable       :: my_cfdm_iwork
-    integer  :: vl, vu, il, iu, nvals, nvecs
-    integer  :: n_tasks_bak, size1n, size3n, my_task_blacs, n_tasks_blacs
-    integer  :: cfdm_ctxt, nprows, npcols, my_prow, my_pcol, fb3n, fb1n
-    integer  :: my_nrows3n, my_nrows1n, my_ncols3n, my_ncols1n, numroc
-    integer, dimension(9)  :: desc3n3n, desc1n
-    
-    integer  :: my_cfdm_lwork, my_cfdm_lrwork, my_cfdm_liwork
-    
-    real(8)  :: eigs(3*size(xyz, 1))
-    integer  :: i_local, j_local, i_atom, j_atom, i_xyz, i, j
-    integer  :: n_negative_eigs, ierr, kptID, nrows_max, ncols_max
-    logical  :: get_eigenvalues, get_eigenvectors, io_proc, &
+
+    complex(8), dimension(:,:), allocatable :: my_relay, my_evecs
+    complex(8), dimension(:), allocatable :: my_cfdm_work
+    complex(8), dimension(:), allocatable :: my_write_work
+    real(8), dimension(:), allocatable :: my_cfdm_rwork
+    integer, dimension(:), allocatable :: my_row2glob, my_col2glob
+    integer, dimension(:), allocatable :: my_cfdm_iwork
+    integer :: vl, vu, il, iu, nvals, nvecs
+    integer :: n_tasks_bak, size1n, size3n, my_task_blacs, n_tasks_blacs
+    integer :: cfdm_ctxt, nprows, npcols, my_prow, my_pcol, fb3n, fb1n
+    integer :: my_nrows3n, my_nrows1n, my_ncols3n, my_ncols1n, numroc
+    integer, dimension(9) :: desc3n3n, desc1n
+
+    integer :: my_cfdm_lwork, my_cfdm_lrwork, my_cfdm_liwork
+
+    real(8) :: eigs(3*size(xyz, 1))
+    integer :: i_local, j_local, i_atom, j_atom, i_xyz, i, j
+    integer :: n_negative_eigs, ierr, kptID, nrows_max, ncols_max
+    logical :: get_eigenvalues, get_eigenvectors, io_proc, &
                 output_data, fexists
-    
-    
+
+
     get_eigenvalues = is_in('E', mode)
     get_eigenvectors = is_in('V', mode)
     output_data = (get_eigenvalues .or. get_eigenvectors)
@@ -4797,18 +4718,18 @@ function get_single_reciprocal_mbd_ene_s(mode, version, xyz, alpha_0, &
         call print_warning("You chose to output eigenvectors but did"//&
                           &" not specify the current k-point index."//&
                           &"Using random index for output file!")
-        
+
         kptID = get_FileID()
     else
         kptID = i_kpt
     endif
-    
+
     n_tasks_bak = n_tasks
     n_tasks = 1
-    
+
     size1n = size(xyz,1)
     size3n = 3*size1n
-    
+
     !! blacs context, grid info, ...
     call BLACS_PINFO(my_task_blacs, n_tasks_blacs)
     do nprows = int(  sqrt( dble(n_tasks_blacs) )  ), 1, -1
@@ -4819,11 +4740,11 @@ function get_single_reciprocal_mbd_ene_s(mode, version, xyz, alpha_0, &
     call BLACS_GRIDINIT(cfdm_ctxt, 'R', nprows, npcols)
     call BLACS_GRIDINFO(cfdm_ctxt, nprows, npcols, my_prow, my_pcol)
     io_proc = ( (my_prow==0) .and. (my_pcol==0) )
-    
+
     !! block sizes, local shapes for (3n by 3n) and (n by n) matrices
     !! fb3n can be adjusted for performance (assert: mod(fb3n, 3) = 0)
     fb3n = 3
-    
+
     fb1n = fb3n/3
     my_nrows3n = max(1, numroc(size3n, fb3n, my_prow, 0, nprows))
     my_nrows1n = max(1, numroc(size1n, fb1n, my_prow, 0, nprows))
@@ -4831,19 +4752,19 @@ function get_single_reciprocal_mbd_ene_s(mode, version, xyz, alpha_0, &
     my_ncols1n = max(1, numroc(size1n, fb1n, my_pcol, 0, npcols))
     nrows_max = max(1, numroc(size3n, fb3n, 0, 0, nprows))
     ncols_max = max(1, numroc(size3n, fb3n, 0, 0, npcols))
-    
+
     !! blacs descriptors
     call descinit(desc3n3n, size3n, size3n, fb3n, fb3n,0,0,cfdm_ctxt,&
                   my_nrows3n, ierr)
-    
+
     call descinit(desc1n, size1n, 1, fb1n, 1, 0, 0, cfdm_ctxt, &
                   my_nrows1n, ierr)
-    
+
     if ( allocated(my_row2glob) ) deallocate(my_row2glob)
     allocate( my_row2glob(my_nrows1n), stat=ierr)
     if ( allocated(my_col2glob) ) deallocate(my_col2glob)
     allocate( my_col2glob(my_ncols1n), stat=ierr)
-    
+
     !! build my_row(col)2glob (and my_diagidx TODO)
     do i_atom=1, my_nrows1n
          my_row2glob(i_atom) = map_local2global(i_atom, nprows, fb1n, &
@@ -4855,7 +4776,7 @@ function get_single_reciprocal_mbd_ene_s(mode, version, xyz, alpha_0, &
     enddo
     if ( allocated(my_relay) ) deallocate(my_relay)
     allocate( my_relay(my_nrows3n, my_ncols3n), stat=ierr)
-    
+
     my_relay(:, :) = cmplx(0.d0, 0.d0, 8)
     call add_dipole_matrix_s(mode, &
                              version, &
@@ -4871,7 +4792,7 @@ function get_single_reciprocal_mbd_ene_s(mode, version, xyz, alpha_0, &
                              unit_cell=unit_cell, &
                              k_point=k_point, &
                              relay_c=my_relay)
-    
+
     do i_local = 1, size(my_row2glob)
         i_atom = my_row2glob(i_local)
         do j_local = 1, size(my_col2glob)
@@ -4882,7 +4803,7 @@ function get_single_reciprocal_mbd_ene_s(mode, version, xyz, alpha_0, &
                 omega(i_atom)*omega(j_atom) &
                 *sqrt(alpha_0(i_atom)*alpha_0(j_atom))* &
                 my_relay(i:i+2, j:j+2)
-            
+
             if (i_atom == j_atom) then
                 do i_xyz = 1, 3
                     i = 3*i_local-3 + i_xyz
@@ -4899,12 +4820,12 @@ function get_single_reciprocal_mbd_ene_s(mode, version, xyz, alpha_0, &
     allocate(my_cfdm_work(1))
     if ( allocated(my_cfdm_rwork) ) deallocate(my_cfdm_rwork)
     allocate(my_cfdm_rwork(1))
-    
+
     if (get_eigenvectors) then
         !! allocate whole array for eigenvectors
         if ( allocated(my_evecs) ) deallocate(my_evecs)
         allocate( my_evecs(my_nrows3n, my_ncols3n), stat=ierr)
-        
+
         selectcase(trim(eigensolver))
             case("qr")        !! QR algorithm (slow, minimal memory)
                 !! manually define size of work space arrays
@@ -4919,7 +4840,7 @@ function get_single_reciprocal_mbd_ene_s(mode, version, xyz, alpha_0, &
                 call PZHEEV('V', 'U', size3n, my_relay, 1, 1, desc3n3n, eigs, &
                        my_evecs, 1, 1, desc3n3n, my_cfdm_work, my_cfdm_lwork, &
                        my_cfdm_rwork, my_cfdm_lrwork, ierr)
-            
+
             case("dandc")     !! Divide & Conquer (fast, large memory)
                 if ( allocated(my_cfdm_iwork) ) deallocate(my_cfdm_iwork)
                 allocate( my_cfdm_iwork(1), stat=ierr )
@@ -4929,7 +4850,7 @@ function get_single_reciprocal_mbd_ene_s(mode, version, xyz, alpha_0, &
                 my_cfdm_lwork = nint( dble(my_cfdm_work(1)) )
                 my_cfdm_lrwork = nint( my_cfdm_rwork(1) )
                 my_cfdm_liwork = my_cfdm_iwork(1)
-                
+
                 deallocate(my_cfdm_work)
                 allocate( my_cfdm_work(my_cfdm_lwork), stat=ierr )
                 deallocate(my_cfdm_rwork, stat=ierr)
@@ -4941,7 +4862,7 @@ function get_single_reciprocal_mbd_ene_s(mode, version, xyz, alpha_0, &
                              my_cfdm_lwork, my_cfdm_rwork, my_cfdm_lrwork, &
                              my_cfdm_iwork, my_cfdm_liwork, ierr)
                 if ( allocated(my_cfdm_iwork) ) deallocate(my_cfdm_iwork)
-            
+
             case("mrrr")      !! MRRR algorithm (fast, medium memory)
                 if ( allocated(my_cfdm_iwork) ) deallocate(my_cfdm_iwork)
                 allocate( my_cfdm_iwork(1), stat=ierr )
@@ -4965,7 +4886,7 @@ function get_single_reciprocal_mbd_ene_s(mode, version, xyz, alpha_0, &
                              my_cfdm_iwork, my_cfdm_liwork, ierr)
                 deallocate(my_cfdm_iwork)
         endselect
-        
+
         !! write eigenvectors to output file
         if (allocated(my_write_work)) deallocate(my_write_work)
         allocate(my_write_work(fb3n), stat=ierr)
@@ -4990,7 +4911,7 @@ function get_single_reciprocal_mbd_ene_s(mode, version, xyz, alpha_0, &
                 call PZHEEV('N', 'U', size3n, my_relay, 1, 1, desc3n3n, eigs, &
                        my_evecs, 1, 1, desc3n3n, my_cfdm_work, my_cfdm_lwork, &
                        my_cfdm_rwork, my_cfdm_lrwork, ierr)
-            
+
             case("dandc")     !! Divide & Conquer (fast, large memory)
                 !! only eigenvectors not implemented in PZHEEVD yet
                 if ( allocated(my_evecs) ) deallocate(my_evecs)
@@ -5014,7 +4935,7 @@ function get_single_reciprocal_mbd_ene_s(mode, version, xyz, alpha_0, &
                              my_cfdm_lwork, my_cfdm_rwork, my_cfdm_lrwork, &
                              my_cfdm_iwork, my_cfdm_liwork, ierr)
                 deallocate(my_cfdm_iwork)
-            
+
             case("mrrr")      !! MRRR algorithm (fast, medium memory)
                 !! dummy for eigenvectors
                 if ( allocated(my_evecs) ) deallocate(my_evecs)
@@ -5042,7 +4963,7 @@ function get_single_reciprocal_mbd_ene_s(mode, version, xyz, alpha_0, &
                 deallocate(my_cfdm_iwork)
         endselect
     endif
-    
+
     !! deallocations
     deallocate(my_evecs)
     deallocate(my_cfdm_work, stat=ierr)
@@ -5051,7 +4972,7 @@ function get_single_reciprocal_mbd_ene_s(mode, version, xyz, alpha_0, &
     deallocate(my_col2glob)
     deallocate(my_relay, stat=ierr)
     call ts(-22)
-    
+
     n_negative_eigs = count(eigs(:) < 0)
     if (n_negative_eigs > 0) then
         call print_warning( &
@@ -5060,9 +4981,9 @@ function get_single_reciprocal_mbd_ene_s(mode, version, xyz, alpha_0, &
         )
         if (param_zero_negative_eigs) where (eigs < 0) eigs = 0.d0
     endif
-    
+
     ene = 1.d0/2*sum(sqrt(eigs))-3.d0/2*sum(omega)
-    
+
     !! write eigenvalues to output file
     if (get_eigenvalues) then
         where (eigs < 0) eigs = 0.d0
@@ -5078,17 +4999,17 @@ function get_single_reciprocal_mbd_ene_s(mode, version, xyz, alpha_0, &
                     close(i, status='delete')
                 endif
             endif
-            
+
             call write_eigenenergies(eigs, &
                                    "mbd_eigenenergies_reciprocal.out", &
                                    k_point=k_point)
         endif
     endif
-    
+
     ! destroy blacs grid, restore n_tasks
     call BLACS_GRIDEXIT(cfdm_ctxt)
     n_tasks = n_tasks_bak
-    
+
 end function get_single_reciprocal_mbd_ene_s
 
 
@@ -5109,30 +5030,30 @@ function map_local2global(idx_local, npX, blocksize, my_pX, pX_start) &
         !! pX_start:   processor row/column where 1st row/column of matrix
         !!             is distributed
         !!!!!!!!!!!!!!!!!
-        
+
         !!!!! RESULT !!!!!
         !! idx_global: corresponding row/column index of global matrix
         !!!!!!!!!!!!!!!!!!
-        
-        integer, intent(in)  :: idx_local,npX,blocksize,my_pX,pX_start
-        integer              :: idx_global
-        
-        
+
+        integer, intent(in) :: idx_local,npX,blocksize,my_pX,pX_start
+        integer :: idx_global
+
+
         idx_global = npX*floor(real(idx_local-1)/blocksize)
         idx_global = idx_global + mod(my_pX-pX_start, npX)
         idx_global = blocksize*idx_global + mod(idx_local-1,blocksize)+1
-        
+
 end function map_local2global
 
 
 subroutine write_eigenenergies(eigenes, evals_fname, k_point)
-    real(8), intent(in)            :: eigenes(:)
-    character(len=*), intent(in)   :: evals_fname
-    
-    real(8), intent(in), optional  :: k_point(3)
-    integer                        :: fid_evals, i_eval
-    
-    
+    real(8), intent(in) :: eigenes(:)
+    character(len=*), intent(in) :: evals_fname
+
+    real(8), intent(in), optional :: k_point(3)
+    integer :: fid_evals, i_eval
+
+
     fid_evals = get_FileID()
     if ( present(k_point) )  then
         open(file=evals_fname, unit=fid_evals, position='append', &
@@ -5141,7 +5062,7 @@ subroutine write_eigenenergies(eigenes, evals_fname, k_point)
         open(file=evals_fname, unit=fid_evals, status='replace', &
              form='formatted')
     endif
-    
+
     if (present(k_point)) write(fid_evals, "(A10,3F10.6)") "k point = ",&
                                       &k_point(1), k_point(2), k_point(3)
     do i_eval=1, size(eigenes)
@@ -5149,20 +5070,20 @@ subroutine write_eigenenergies(eigenes, evals_fname, k_point)
     enddo
     if ( present(k_point) ) write(fid_evals, *) ""
     close(fid_evals)
-    
+
 end subroutine write_eigenenergies
 
 
 function get_FileID()
-    integer        :: get_FileID
-    integer, save  :: currentID = minFileID
-    
+    integer :: get_FileID
+    integer, save :: currentID = minFileID
+
     if (currentID > maxFileID) then
         call print_log("error('get_FileID: No more free file identification numbers')")
     end if
     get_FileID = currentID
     currentID = currentID + 1
-    
+
 end function get_FileID
 
 
@@ -5177,49 +5098,49 @@ subroutine PZWRITEEIGVEC( FILNAM, M, N, A, IA, JA, DESCA, IRWRIT, &
     ! Purpose
     ! =======
     !
-    ! PZWRITEEIGVEC writes to a file named FILNAM a distributed matrix 
+    ! PZWRITEEIGVEC writes to a file named FILNAM a distributed matrix
     ! sub(A) denoting A(IA:IA+M-1,JA:JA+N-1). The local pieces are sent
     ! to and written by the process of coordinates (IRWWRITE, ICWRIT).
     !
     !  WORK must be of size >= MB_ = DESCA( MB_ ).
     !
     ! ==================================================================
-    
-    integer, intent(in)            :: IA, ICWRIT, IRWRIT, JA, M, N
-    character(len=*), intent(in)   :: FILNAM
-    integer, intent(in)            :: DESCA(:)
-    complex(8), intent(in)         :: A(*), WORK(:)
-    real(8), intent(in), optional  :: KPOINT(3)
-    
-    integer, parameter  :: CTXT_=2, LLD_=9, MB_=5, NB_=6
-    integer             :: H, I, IACOL, IAROW, IB, ICTXT, ICURCOL, &
+
+    integer, intent(in) :: IA, ICWRIT, IRWRIT, JA, M, N
+    character(len=*), intent(in) :: FILNAM
+    integer, intent(in) :: DESCA(:)
+    complex(8), intent(in) :: A(*), WORK(:)
+    real(8), intent(in), optional :: KPOINT(3)
+
+    integer, parameter :: CTXT_=2, LLD_=9, MB_=5, NB_=6
+    integer :: H, I, IACOL, IAROW, IB, ICTXT, ICURCOL, &
                            ICURROW, II, IIA, I_N, J, JB, JJ, JJA, JN,&
                            K, LDA, MYCOL, MYROW, NPCOL, NPROW, ICEIL,&
                            NOUT
-    
-    
+
+
     !! Get grid parameters
     ICTXT = DESCA( CTXT_ )
     call BLACS_GRIDINFO( ICTXT, NPROW, NPCOL, MYROW, MYCOL )
-    
+
     NOUT = get_FileId()
     if( MYROW .eq. IRWRIT .and. MYCOL .eq. ICWRIT ) then
         open( NOUT, file=FILNAM, status='unknown', form='unformatted' )
         write( NOUT ) M, N
         if ( present(KPOINT) ) write( NOUT ) KPOINT
     endif
-    
+
     call INFOG2L( IA, JA, DESCA, NPROW, NPCOL, MYROW, MYCOL, &
                   IIA, JJA, IAROW, IACOL )
-    
+
     ICURROW = IAROW
     ICURCOL = IACOL
     II = IIA
     JJ = JJA
     LDA = DESCA( LLD_ )
-    
+
     !! Handle the first block of column separately
-    
+
     JN = min( ICEIL( JA, DESCA( NB_ ) ) * DESCA( NB_ ), JA+N-1 )
     JB = JN-JA+1
     do H=0, JB-1
@@ -5246,7 +5167,7 @@ subroutine PZWRITEEIGVEC( FILNAM, M, N, A, IA, JA, DESCA, IRWRIT, &
         if( MYROW.eq.ICURROW ) II = II + IB
         ICURROW = mod( ICURROW+1, NPROW )
         call BLACS_BARRIER( ICTXT, 'All' )
-        
+
         !! Loop over remaining block of rows
         do I=I_N+1, IA+M-1, DESCA( MB_ )
             IB = min( DESCA( MB_ ), IA+M-I )
@@ -5273,15 +5194,15 @@ subroutine PZWRITEEIGVEC( FILNAM, M, N, A, IA, JA, DESCA, IRWRIT, &
             ICURROW = mod( ICURROW+1, NPROW )
             call BLACS_BARRIER( ICTXT, 'All' )
         enddo
-        
+
         II = IIA
         ICURROW = IAROW
     enddo
-    
+
     if( MYCOL.eq.ICURCOL ) JJ = JJ + JB
     ICURCOL = mod( ICURCOL+1, NPCOL )
     call BLACS_BARRIER( ICTXT, 'All' )
-    
+
     !! Loop over remaining column blocks
     do J=JN+1, JA+N-1, DESCA( NB_ )
         JB = min(  DESCA( NB_ ), JA+N-J )
@@ -5310,7 +5231,7 @@ subroutine PZWRITEEIGVEC( FILNAM, M, N, A, IA, JA, DESCA, IRWRIT, &
             if( MYROW.eq.ICURROW ) II = II + IB
             ICURROW = mod( ICURROW+1, NPROW )
             call BLACS_BARRIER( ICTXT, 'All' )
-            
+
             !! Loop over remaining block of rows
             do I=I_N+1, IA+M-1, DESCA( MB_ )
                 IB = min( DESCA( MB_ ), IA+M-I )
@@ -5337,15 +5258,15 @@ subroutine PZWRITEEIGVEC( FILNAM, M, N, A, IA, JA, DESCA, IRWRIT, &
                 ICURROW = mod( ICURROW+1, NPROW )
                 call BLACS_BARRIER( ICTXT, 'All' )
             enddo
-            
+
             II = IIA
             ICURROW = IAROW
         enddo
-        
+
         if( MYCOL.eq.ICURCOL ) JJ = JJ + JB
         ICURCOL = mod( ICURCOL+1, NPCOL )
         call BLACS_BARRIER( ICTXT, 'All' )
-        
+
     enddo
     if( MYROW.eq.IRWRIT .and. MYCOL.eq.ICWRIT ) then
         close( NOUT )
@@ -5372,28 +5293,28 @@ subroutine PDWRITEEIGVEC( FILNAM, M, N, A, IA, JA, DESCA, IRWRIT, &
     !   WORK must be of size >= MB_ = DESCA( MB_ ).
     !
     ! ==================================================================
-    
-    integer, intent(in)           :: IA, ICWRIT, IRWRIT, JA, M, N
-    character(len=*), intent(in)  :: FILNAM
-    integer, intent(in)           :: DESCA(:)
-    real(8), intent(in)           :: A(*), WORK(:)
-    
-    integer, parameter  :: CTXT_=2, LLD_=9, MB_=5, NB_=6
-    integer  :: H, I, IACOL, IAROW, IB, ICTXT, ICURCOL, ICURROW, II, &
+
+    integer, intent(in) :: IA, ICWRIT, IRWRIT, JA, M, N
+    character(len=*), intent(in) :: FILNAM
+    integer, intent(in) :: DESCA(:)
+    real(8), intent(in) :: A(*), WORK(:)
+
+    integer, parameter :: CTXT_=2, LLD_=9, MB_=5, NB_=6
+    integer :: H, I, IACOL, IAROW, IB, ICTXT, ICURCOL, ICURROW, II, &
                 IIA, I_N, J, JB, JJ, JJA, JN, K, LDA, MYCOL, MYROW, &
                 NPCOL, NPROW, ICEIL, NOUT
-    
-    
+
+
     !! Get grid parameters
     ICTXT = DESCA( CTXT_ )
     call BLACS_GRIDINFO( ICTXT, NPROW, NPCOL, MYROW, MYCOL )
-    
+
     NOUT = get_FileId()
     if( MYROW.eq.IRWRIT .and. MYCOL.eq.ICWRIT ) then
         open( NOUT, file=FILNAM, status='unknown', form='unformatted' )
         write( NOUT ) M, N
     endif
-    
+
     call INFOG2L( IA, JA, DESCA, NPROW, NPCOL, MYROW, MYCOL, &
                   IIA, JJA, IAROW, IACOL )
     ICURROW = IAROW
@@ -5401,7 +5322,7 @@ subroutine PDWRITEEIGVEC( FILNAM, M, N, A, IA, JA, DESCA, IRWRIT, &
     II = IIA
     JJ = JJA
     LDA = DESCA( LLD_ )
-    
+
     !! Handle the first block of column separately
     JN = min( ICEIL( JA, DESCA( NB_ ) ) * DESCA( NB_ ), JA+N-1 )
     JB = JN-JA+1
@@ -5429,7 +5350,7 @@ subroutine PDWRITEEIGVEC( FILNAM, M, N, A, IA, JA, DESCA, IRWRIT, &
         if( MYROW.eq.ICURROW ) II = II + IB
         ICURROW = mod( ICURROW+1, NPROW )
         call BLACS_BARRIER( ICTXT, 'All' )
-        
+
         !! Loop over remaining block of rows
         do I=I_N+1, IA+M-1, DESCA( MB_ )
             IB = MIN( DESCA( MB_ ), IA+M-I )
@@ -5455,15 +5376,15 @@ subroutine PDWRITEEIGVEC( FILNAM, M, N, A, IA, JA, DESCA, IRWRIT, &
             ICURROW = mod( ICURROW+1, NPROW )
             call BLACS_BARRIER( ICTXT, 'All' )
         enddo
-        
+
         II = IIA
         ICURROW = IAROW
     enddo
-    
+
     if( MYCOL.eq.ICURCOL ) JJ = JJ + JB
     ICURCOL = mod( ICURCOL+1, NPCOL )
     call BLACS_BARRIER( ICTXT, 'All' )
-        
+
     !! Loop over remaining column blocks
     do J = JN+1, JA+N-1, DESCA( NB_ )
         JB = min(  DESCA( NB_ ), JA+N-J )
@@ -5491,7 +5412,7 @@ subroutine PDWRITEEIGVEC( FILNAM, M, N, A, IA, JA, DESCA, IRWRIT, &
             if( MYROW.eq.ICURROW ) II = II + IB
             ICURROW = mod( ICURROW+1, NPROW )
             call BLACS_BARRIER( ICTXT, 'All' )
-            
+
             !! Loop over remaining block of rows
             do I = I_N+1, IA+M-1, DESCA( MB_ )
                 IB = min( DESCA( MB_ ), IA+M-I )
@@ -5517,16 +5438,16 @@ subroutine PDWRITEEIGVEC( FILNAM, M, N, A, IA, JA, DESCA, IRWRIT, &
                 ICURROW = mod( ICURROW+1, NPROW )
                 call BLACS_BARRIER( ICTXT, 'All' )
             enddo
-            
+
             II = IIA
             ICURROW = IAROW
         enddo
-        
+
         if( MYCOL.eq.ICURCOL ) JJ = JJ + JB
         ICURCOL = mod( ICURCOL+1, NPCOL )
         call BLACS_BARRIER( ICTXT, 'All' )
     enddo
-    
+
     if( MYROW.eq.IRWRIT .and. MYCOL.eq.ICWRIT ) then
         close( NOUT )
     endif
@@ -5535,13 +5456,13 @@ end subroutine PDWRITEEIGVEC
 
 
 subroutine ZWRITEEIGVEC(eigenvectors, filenam, kpoint)
-    complex(8), intent(in)         :: eigenvectors(:,:)
-    character(len=*),intent(in)    :: filenam
-    real(8), intent(in), optional  :: kpoint(3)
-    
-    integer  :: fID, n, i, j
-    
-    
+    complex(8), intent(in) :: eigenvectors(:,:)
+    character(len=*),intent(in) :: filenam
+    real(8), intent(in), optional :: kpoint(3)
+
+    integer :: fID, n, i, j
+
+
     fID = get_FileId()
     n = size(eigenvectors,1)
     open( fID, file=filenam, status='unknown', form='unformatted' )
@@ -5553,17 +5474,17 @@ subroutine ZWRITEEIGVEC(eigenvectors, filenam, kpoint)
         enddo
     enddo
     close( fID )
-    
+
 end subroutine ZWRITEEIGVEC
 
 
 subroutine DWRITEEIGVEC(eigenvectors, filenam)
-    real(8), intent(in)           :: eigenvectors(:,:)
-    character(len=*), intent(in)  :: filenam
-    
-    integer  :: fID, n, i, j
-    
-    
+    real(8), intent(in) :: eigenvectors(:,:)
+    character(len=*), intent(in) :: filenam
+
+    integer :: fID, n, i, j
+
+
     fID = get_FileId()
     n = size(eigenvectors,1)
     open( fID, file=filenam, status='unknown', form='unformatted' )
@@ -5579,21 +5500,19 @@ end subroutine DWRITEEIGVEC
 
 
 subroutine exit_blacs_and_finalize(continuation)
-    integer, intent(in), optional  :: continuation
-    integer  :: blacs_continue
-    
-    
+    integer, intent(in), optional :: continuation
+    integer :: blacs_continue
+
+
     if ( present(continuation) ) then
         blacs_continue = continuation
     else
         blacs_continue = 0
     endif
-    
+
     call blacs_exit(blacs_continue)
-    
+
 end subroutine exit_blacs_and_finalize
-
-
 
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !!     DIPOLE-DIPOLE COUPLING AND DAMPING     !!
@@ -5698,7 +5617,7 @@ function T_overlap_coulomb(rxyz, overlap, C6, beta, a) result(T)
     qene = overlap*r**6/(C6*erff**6)
     qenep = 2.d0*overlap*r**5*(-(1.d0/exp36)*r/sqrt(pi)+3.d0*erff)/(C6*erff**7)
     qenepp = (1.d0/exp36**2)*overlap*r**4/(9*C6*pi*erff**8) &
-        *(42*r**2+exp36*sqrt(pi)*r*(-216+r**2)*erff & 
+        *(42*r**2+exp36*sqrt(pi)*r*(-216+r**2)*erff &
         +270.d0*exp36**2*pi*erff**2)
     zeta_1 = 1.d0/2*(2.d0-erf(a*(beta-qene))+erf(a*(beta+qene)) &
         +2*a*r*qenep/sqrt(pi)*(-exp(-a**2*(beta-qene)**2) &
@@ -5806,10 +5725,6 @@ elemental function terf(r, r0, a)
 
     terf = 0.5d0*(erf(a*(r+r0))+erf(a*(r-r0)))
 end function
-
-
-
-
 
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !!     GENERAL OPERATIONS/ROUTINES     !!
@@ -6072,10 +5987,6 @@ character(len=50) elemental function tostr_dble_(x, format)
     tostr_dble_ = adjustl(tostr_dble_)
 end function tostr_dble_
 
-
-
-
-
 !!!!!!!!!!!!!!!!!!!!
 !!     TIMING     !!
 !!!!!!!!!!!!!!!!!!!!
@@ -6085,7 +5996,7 @@ subroutine ts(id, always)
     logical, intent(in), optional :: always
 
     if (measure_time .or. present(always)) then
-        call system_clock(ts_cnt, ts_rate, ts_cnt_max) 
+        call system_clock(ts_cnt, ts_rate, ts_cnt_max)
         if (id > 0) then
             timestamps(id) = timestamps(id)-ts_cnt
         else
@@ -6100,7 +6011,7 @@ end subroutine ts
 function clock_rate() result(rate)
     integer :: cnt, rate, cnt_max
 
-    call system_clock(cnt, rate, cnt_max) 
+    call system_clock(cnt, rate, cnt_max)
 end function clock_rate
 
 
