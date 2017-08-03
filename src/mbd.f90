@@ -5191,9 +5191,7 @@ subroutine PZWRITEEIGVEC( FILNAM, M, N, A, IA, JA, DESCA, IRWRIT, &
     complex(8), intent(in)         :: A(*), WORK(:)
     real(8), intent(in), optional  :: KPOINT(3)
     
-    integer, parameter  :: BLOCK_CYCLIC_2D=1, CSRC_=8, CTXT_=2, &
-                           DLEN_=9, DT_=1, LLD_=9, MB_=5, M_=3, &
-                           NB_=6, N_=4, RSRC_=7
+    integer, parameter  :: CTXT_=2, LLD_=9, MB_=5, NB_=6
     integer             :: H, I, IACOL, IAROW, IB, ICTXT, ICURCOL, &
                            ICURROW, II, IIA, I_N, J, JB, JJ, JJA, JN,&
                            K, LDA, MYCOL, MYROW, NPCOL, NPROW, ICEIL,&
@@ -5380,9 +5378,7 @@ subroutine PDWRITEEIGVEC( FILNAM, M, N, A, IA, JA, DESCA, IRWRIT, &
     integer, intent(in)           :: DESCA(:)
     real(8), intent(in)           :: A(*), WORK(:)
     
-    integer, parameter  :: BLOCK_CYCLIC_2D=1, CSRC_=8, CTXT_=2, &
-                           DLEN_=9, DT_=1, LLD_=9, MB_=5, M_=3, &
-                           NB_=6, N_=4, RSRC_=7
+    integer, parameter  :: CTXT_=2, LLD_=9, MB_=5, NB_=6
     integer  :: H, I, IACOL, IAROW, IB, ICTXT, ICURCOL, ICURROW, II, &
                 IIA, I_N, J, JB, JJ, JJA, JN, K, LDA, MYCOL, MYROW, &
                 NPCOL, NPROW, ICEIL, NOUT
