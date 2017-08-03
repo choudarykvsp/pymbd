@@ -133,12 +133,13 @@ interface tostr
 end interface
 
 ! external :: ZHEEV, DGEEV, DSYEV, DGETRF, DGETRI, DGESV, ZGETRF, &
-!     ZGETRI, ZGEEV, ZGEEB, BLACS_BARRIER, BLACS_GRIDINFO, &
-!     INFOG2L, DGERV2D, DGESD2D, ICEIL, PDGETRI, PDSYEV, &
-!     numroc, PZHEEV, BLACS_PINFO, BLACS_GET, BLACS_GRIDINIT, &
+!     ZGETRI, ZGEEV, BLACS_BARRIER, BLACS_GRIDINFO, &
+!     INFOG2L, DGERV2D, DGESD2D, PDGETRI, PDSYEV, &
+!     PZHEEV, BLACS_PINFO, BLACS_GET, BLACS_GRIDINIT, &
 !     descinit, PDGETRF, DGSUM2D, BLACS_GRIDEXIT, pdelget, &
 !     PDSYEVD, PZHEEVD, PDSYEVR, PZHEEVR, DSYEVD, ZHEEVD, &
-!     DSYEVR, ZHEEVR, DGEMM
+!     DSYEVR, ZHEEVR, DGEMM, blacs_exit, ZGESD2D, ZGERV2D, &
+!     ZGEMM
 
 contains
 
@@ -2902,7 +2903,6 @@ subroutine diagonalize_sym_dble_(mode, A, eigs)
     real(8), intent(inout) :: A(:, :)
     real(8), intent(out) :: eigs(size(A, 1))
 
-    real(8) :: lwork_arr
     real(8), allocatable :: work_arr(:), vecs(:,:)
     integer :: n, vl, vu, il, iu, nvals
     integer, allocatable :: iwork_arr(:), isupp(:)
@@ -3378,7 +3378,7 @@ subroutine add_dipole_matrix_s(mode, version, xyz, row2glob, col2glob, &
     real(8) :: sigma_ij, volume, ewald_alpha, real_space_cutoff
     complex(8) :: Tpp_c(3, 3)
     integer :: i_local, j_local, i_atom, j_atom, i_cell, idx_cell(3),&
-                range_cell(3), i, j, i_xyz
+                range_cell(3), i, j
     logical :: is_crystal, is_reciprocal, is_low_dim, mute, do_ewald
 
 
