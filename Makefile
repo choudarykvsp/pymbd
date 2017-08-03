@@ -10,13 +10,14 @@ BLDDIR = build
 #IOLIBDIR = lib_io
 -include system.mk
 
-all: mbd mbd_scalapack
+all: mbd
 
-mbd: mbd.f90 $(addprefix $(BLDDIR)/,mbd_interface.o mbd_helper.o)
+mbd: mbd.f90 \
+	$(addprefix $(BLDDIR)/,mbd_interface.o mbd_helper.o)
 	@mkdir -p $(BLDDIR)
 	$(F2PY) -c --build-dir $(BLDDIR) --fcompiler=$(FVENDOR) \
-		   --f90exec=$(FC) --f90flags="$(FFLAGS)" --compiler=$(CVENDOR) \
-		   $(wordlist 2,3,$^) -m $@ $(LDFLAGS) $<
+	--f90exec=$(FC) --f90flags="$(FFLAGS)" --compiler=$(CVENDOR) \
+	$(wordlist 2,3,$^) -m $@ $(LDFLAGS) $<
 	rsync -a $(BLDDIR)/*.mod .
 
 mbd_math: mbd_math.f90 $(addprefix $(BLDDIR)/,mbd.o mbd_interface.o mbd_helper.o)
@@ -25,15 +26,6 @@ mbd_math: mbd_math.f90 $(addprefix $(BLDDIR)/,mbd.o mbd_interface.o mbd_helper.o
 		   --f90exec=$(FC) --f90flags="$(FFLAGS)" --compiler=$(CVENDOR) \
 		   $(filter-out $<,$^) -m $@ $(LDFLAGS) $<
 	rsync -a $(BLDDIR)/*.mod .
-
-mbd_scalapack: mbd_scalapack.f90 \
-	$(addprefix $(BLDDIR)/,mbd_interface.o mbd_helper.o)
-	@mkdir -p $(BLDDIR)
-	$(F2PY) -c --build-dir $(BLDDIR) --fcompiler=$(FVENDOR) \
-	--f90exec=$(FC) --f90flags="$(FFLAGS)" --compiler=$(CVENDOR) \
-	$(wordlist 2,3,$^) -m $@ $(LDFLAGS) $<
-	rsync -a $(BLDDIR)/*.mod .
-
 
 #mbd_scalapack: mbd_scalapack.f90 \
 #	$(addprefix $(BLDDIR)/,mbd_interface.o mbd_helper.o) \
@@ -64,5 +56,4 @@ clean:
 
 distclean: clean
 	rm -f mbd.*so
-	rm -f mbd_scalapack.*so
 	rm -rf mbd.*dSYM

@@ -7,13 +7,13 @@ Also contains corresponding ScaLAPACK implementation of main routines.
 
 Adapt `system.example.mk` for your system, save it as `system.mk` and make sure you have `f2py` installed. Then run `make`.
 
-In order to make use of the ScaLAPACK version run `make mbd_scalapack`.
+In order to make use of the ScaLAPACK version run `make mbd`.
 
 ### Usage
 
 See the Jupyter notebook in `playground.ipynb`.
 
-ScaLAPACK routines have the suffix `_s`, e.g. `mbd_scalapack.get_mbd_energy_s(...)` instead of `mbd.get_mbd_energy(...)`. However, original MPI/LAPACK routines (such as `get_mbd_energy`) are still available in `mbd_scalapack`. Hence, `mbd_scalapack.get_mbd_energy(...)` will call MPI/LAPACK routine and `mbd_scalapack.get_mbd_energy_s(...)` calls the ScaLAPACK version of it.
+ScaLAPACK routines have the suffix `_s`, e.g. `mbd.get_mbd_energy_s(...)` instead of `mbd.get_mbd_energy(...)`. However, original MPI/LAPACK routines (such as `get_mbd_energy`) are still available. Hence, `mbd.get_mbd_energy(...)` will call MPI/LAPACK routine and `mbd.get_mbd_energy_s(...)` calls the ScaLAPACK version of it.
 
 Latest version support use of different (Sca)LAPACK eigensolvers ("QR", "Divide and Conquer", "MR3")
 
