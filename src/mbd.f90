@@ -2704,7 +2704,7 @@ subroutine get_onsite_modes(mode, version, xyz, alpha_0, omega, R_vdw, &
     
     real(8), allocatable           :: modes_on(:,:)
     complex(8), allocatable        :: modes_on_c(:,:)
-    character(len=max(len(prefix_mbd_modes), 14))  :: prefix_in
+    character(len=100)  :: prefix_in
     logical                        :: is_crystal
     integer                        :: ik
     real(8)                        :: k_point(3)
