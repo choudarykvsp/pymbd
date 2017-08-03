@@ -164,8 +164,7 @@ function get_ts_energy( mode, version, xyz, C6, alpha_0, R_vdw, s_R, &
 
     real(8) :: C6_ij, r(3), r_norm, f_damp, R_vdw_ij, overlap_ij, &
         ene_shell, ene_pair, R_cell(3)
-    integer :: i_shell, i_cell, i_atom, j_atom, range_cell(3), &
-               minr_cell(3), idx_cell(3)
+    integer :: i_shell, i_cell, i_atom, j_atom, range_cell(3), idx_cell(3)
     real(8), parameter :: shell_thickness = 10.d0
     logical :: is_crystal, is_parallel
 
@@ -182,10 +181,9 @@ function get_ts_energy( mode, version, xyz, C6, alpha_0, R_vdw, s_R, &
         else
             range_cell = (/ 0, 0, 0 /)
         end if
-        minr_cell = -1*range_cell
         idx_cell = (/ 0, 0, -1 /)
         do i_cell = 1, product(1+2*range_cell)
-            call shift_cell(idx_cell, minr_cell, range_cell)
+            call shift_cell(idx_cell, -range_cell, range_cell)
             ! MPI code begin
             if (is_parallel .and. is_crystal) then
                 if (my_task /= modulo(i_cell, n_tasks)) cycle
@@ -616,7 +614,7 @@ subroutine add_ewald_dipole_parts(mode, xyz, unit_cell, alpha, &
                     i = 3*(i_atom-1)+i_xyz
                     j = 3*(j_atom-1)+j_xyz
                     elem = 4*pi/volume*k_point(i_xyz)*k_point(j_xyz)/k_sq &
-                        *exp(-k_sq/(4*alpha*alpha))
+                        *exp(-k_sq/(4*alpha**2))
                     if (is_reciprocal) then
                         relay_c(i, j) = relay_c(i, j) + elem
                         if (i_atom /= j_atom) then
@@ -782,7 +780,7 @@ function run_scs(mode, version, xyz, alpha, R_vdw, beta, a, unit_cell) &
         R_vdw(size(xyz, 1)), &
         beta, a, &
         unit_cell(3, 3)
-    real(8), dimension(size(alpha, 1), size(alpha, 2)) :: alpha_scs
+    real(8) :: alpha_scs(size(alpha, 1), size(alpha, 2))
 
     real(8) :: alpha_full(3*size(xyz, 1), 3*size(xyz, 1))
     integer :: i_grid_omega
@@ -808,7 +806,7 @@ function run_scs(mode, version, xyz, alpha, R_vdw, beta, a, unit_cell) &
             version, &
             xyz, &
             alpha=alpha(i_grid_omega+1, :), &
-            R_vdw=R_vdw(:), &
+            R_vdw=R_vdw, &
             beta=beta, &
             a=a, &
             unit_cell=unit_cell)
