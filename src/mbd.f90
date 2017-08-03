@@ -18,7 +18,6 @@ use mbd_interface, only: &
     sync_sum, broadcast, print_error, print_warning, print_log, pi
 use mbd_helper, only: &
     is_in, blanked
-use ifport
 
 implicit none
 
